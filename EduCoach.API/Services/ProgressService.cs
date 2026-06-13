@@ -8,15 +8,18 @@ public sealed class ProgressService(AppDbContext dbContext)
 {
     public async Task<ProgressSummaryResponse> GetSummaryAsync(Guid userId)
     {
-        var topics = await dbContext.UserProgress
+        var progressEntries = await dbContext.UserProgress
             .AsNoTracking()
             .Include(progress => progress.Topic)
             .Where(progress => progress.UserId == userId)
             .OrderBy(progress => progress.TopicId)
+            .ToListAsync();
+
+        var topics = progressEntries
             .Select(progress => new TopicProgressResponse
             {
                 TopicId = progress.TopicId,
-                TopicName = progress.Topic!.Name,
+                TopicName = progress.Topic?.Name ?? "Tema",
                 CurrentLevel = progress.CurrentLevel,
                 TotalCorrect = progress.TotalCorrect,
                 TotalAttempts = progress.TotalAttempts,
@@ -25,7 +28,7 @@ public sealed class ProgressService(AppDbContext dbContext)
                     : Math.Round((double)progress.TotalCorrect / progress.TotalAttempts * 100, 2),
                 StreakDays = progress.StreakDays
             })
-            .ToListAsync();
+            .ToList();
 
         return new ProgressSummaryResponse { Topics = topics };
     }
