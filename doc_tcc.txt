@@ -1,0 +1,52 @@
+Desarrollo de una APP para impactar positivamente en los Objetivos de Desarrollo 
+Sostenible (ODS) 
+Objetivo General 
+Diseñar y prototipar una aplicación móvil funcional que aborde uno de los Objetivos de 
+Desarrollo Sostenible de la ONU, aplicando conocimientos de análisis de requerimientos, 
+diseño de base de datos, diseño de interfaz y desarrollo móvil. 
+Objetivos de desarrollo sostenible 
+
+Link
+https://www.un.org/sustainabledevelopment/es/sustainable-development-goals/
+
+Exactamente mi grupo escogio esta
+https://www.un.org/sustainabledevelopment/es/education/
+
+
+Descripción del Trabajo 
+Cada CIPA deberá: 
+Identificar y Describir un Problema Específico relacionado con el ODS seleccionado, 
+contextualizado en su entorno local o global. 
+Proponer una Solución en forma de Aplicación Móvil, explicando cómo su solución 
+contribuye a mitigar o resolver el problema. 
+Definir los Requerimientos Funcionales y No Funcionales de la aplicación. 
+Diseñar un Modelo de Base de Datos adaptado a una app móvil. 
+Construir un Prototipo Funcional de la App usando herramientas de desarrollo móvil 
+(puede ser Flutter, React Native, Android Studio o cualquier framework ). 
+Preparar una Presentación Final donde expliquen el problema, la solución, el diseño 
+técnico y una demo del prototipo funcional. 
+Entregables 
+Documento de Requerimientos 
+Descripción del problema. 
+Objetivo de la aplicación. 
+Requerimientos funcionales. 
+Requerimientos no funcionales. 
+Público objetivo. 
+Justificación del impacto en el ODS. 
+Modelo de Base de Datos (Diagrama ER o similar): 
+Entidades, atributos y relaciones. 
+Adaptación para uso en dispositivos móviles (uso de SQLite, Firebase, etc.). 
+Prototipo Funcional de la App: 
+Al menos 3 pantallas funcionales. 
+Flujo de navegación básico. 
+Interacción con la base de datos local o en la nube. 
+Diseño UI/UX acorde al público objetivo. 
+Presentación Final (Pitch): 
+Problema y justificación (con datos). 
+Cómo la app resuelve o contribuye al ODS. 
+Demo del prototipo. 
+Tecnologías utilizadas. 
+Nota: 
+No es necesario que suba el APK, podría desplegar la APP en una tienda o utilizar los diferentes 
+medios para despliegues gratuitos. Otra opción seria incluir un enlace con el video del 
+funcionamiento de la APP

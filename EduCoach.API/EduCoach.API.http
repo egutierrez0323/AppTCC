@@ -1,0 +1,10 @@
+@EduCoach.API_HostAddress = http://localhost:5012
+
+POST {{EduCoach.API_HostAddress}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Juan Demo",
+  "email": "juan@educoach.dev",
+  "password": "secret123"
+}

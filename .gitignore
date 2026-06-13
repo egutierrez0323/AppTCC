@@ -1,0 +1,35 @@
+# General
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.user
+*.suo
+*.db
+
+# IDEs
+.idea/
+.vscode/
+
+# GitHub / OS
+desktop.ini
+
+# .NET
+**/bin/
+**/obj/
+**/TestResults/
+
+# Flutter / Dart
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.pub/
+**/.pub-cache/
+**/build/
+**/coverage/
+
+# Platform generated
+educoach_app/android/app/debug/
+educoach_app/android/app/profile/
+educoach_app/android/app/release/
+educoach_app/ios/Flutter/.last_build_id

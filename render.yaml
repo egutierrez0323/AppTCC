@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: educoach-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./EduCoach.API/Dockerfile
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: Database__Provider
+        value: Postgres
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+      - key: Jwt__Issuer
+        value: EduCoach
+      - key: Jwt__Audience
+        value: EduCoach.Mobile
+      - key: Jwt__SecretKey
+        sync: false
+      - key: DeepSeek__BaseUrl
+        sync: false
+      - key: DeepSeek__ApiKey
+        sync: false
+      - key: DeepSeek__Model
+        value: deepseek-chat

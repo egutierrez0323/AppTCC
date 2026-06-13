@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+**/.dart_tool/
+**/build/
+**/.idea/
+**/.vscode/
+**/TestResults/
+**/*.user
+**/*.suo
+**/*.db
+**/*.log
+educoach_app/.pub-cache/
