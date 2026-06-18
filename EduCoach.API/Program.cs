@@ -3,6 +3,7 @@ using EduCoach.API.Data;
 using EduCoach.API.Options;
 using EduCoach.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -73,9 +74,17 @@ using (var scope = app.Services.CreateScope())
     await SeedData.InitializeAsync(dbContext);
 }
 
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
+
 app.UseSwagger();
 app.UseSwaggerUI();
-app.UseHttpsRedirection();
+if (!app.Environment.IsProduction())
+{
+    app.UseHttpsRedirection();
+}
 app.UseCors("mobile");
 app.UseAuthentication();
 app.UseAuthorization();

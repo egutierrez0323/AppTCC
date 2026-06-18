@@ -8,10 +8,16 @@ class PracticeScreen extends StatefulWidget {
     super.key,
     required this.api,
     required this.session,
+    required this.onUnauthorized,
+    this.initialTopicId,
+    this.initialLevel,
   });
 
   final EduCoachApi api;
   final AuthSession session;
+  final Future<void> Function() onUnauthorized;
+  final int? initialTopicId;
+  final int? initialLevel;
 
   @override
   State<PracticeScreen> createState() => _PracticeScreenState();
@@ -23,13 +29,20 @@ class _PracticeScreenState extends State<PracticeScreen> {
     {'id': 2, 'name': 'Algebra Basica'},
   ];
 
-  int _topicId = 1;
-  int _level = 1;
+  late int _topicId;
+  late int _level;
   bool _isLoading = false;
   PracticeSessionData? _sessionData;
   PracticeAnswerResult? _summary;
   int _currentIndex = 0;
   String? _selectedOption;
+
+  @override
+  void initState() {
+    super.initState();
+    _topicId = widget.initialTopicId ?? 1;
+    _level = widget.initialLevel ?? 1;
+  }
 
   Future<void> _startPractice() async {
     setState(() {
@@ -55,6 +68,10 @@ class _PracticeScreenState extends State<PracticeScreen> {
       });
     } catch (error) {
       if (!mounted) {
+        return;
+      }
+      if (error is ApiException && error.statusCode == 401) {
+        await widget.onUnauthorized();
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
@@ -128,6 +145,10 @@ class _PracticeScreenState extends State<PracticeScreen> {
       }
     } catch (error) {
       if (!mounted) {
+        return;
+      }
+      if (error is ApiException && error.statusCode == 401) {
+        await widget.onUnauthorized();
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(

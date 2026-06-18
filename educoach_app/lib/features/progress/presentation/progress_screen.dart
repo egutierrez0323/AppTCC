@@ -3,29 +3,56 @@ import 'package:flutter/material.dart';
 import '../../../core/api/educoach_api.dart';
 import '../../auth/session_storage.dart';
 
-class ProgressScreen extends StatelessWidget {
+class ProgressScreen extends StatefulWidget {
   const ProgressScreen({
     super.key,
     required this.api,
     required this.session,
+    required this.onUnauthorized,
   });
 
   final EduCoachApi api;
   final AuthSession session;
+  final Future<void> Function() onUnauthorized;
+
+  @override
+  State<ProgressScreen> createState() => _ProgressScreenState();
+}
+
+class _ProgressScreenState extends State<ProgressScreen> {
+  late Future<List<ProgressTopic>> _future = _load();
+
+  Future<List<ProgressTopic>> _load() async {
+    return widget.api.getProgress(widget.session.token);
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _future = _load());
+    await _future;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Mi progreso')),
       body: FutureBuilder<List<ProgressTopic>>(
-        future: api.getProgress(session.token),
+        future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text(snapshot.error.toString()));
+            final error = snapshot.error;
+            if (error is ApiException && error.statusCode == 401) {
+              WidgetsBinding.instance.addPostFrameCallback((_) => widget.onUnauthorized());
+              return const Center(child: Text('Sesion expirada. Inicia sesion nuevamente.'));
+            }
+
+            return _ErrorView(
+              message: error.toString(),
+              onRetry: _refresh,
+            );
           }
 
           final topics = snapshot.data ?? const <ProgressTopic>[];
@@ -41,21 +68,24 @@ class ProgressScreen extends StatelessWidget {
             );
           }
 
-          return ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              Text(
-                'Resumen de ${session.name}',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 20),
-              for (final topic in topics) ...[
-                _ProgressTile(topic: topic),
-                const SizedBox(height: 16),
+          return RefreshIndicator(
+            onRefresh: _refresh,
+            child: ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                Text(
+                  'Resumen de ${widget.session.name}',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 20),
+                for (final topic in topics) ...[
+                  _ProgressTile(topic: topic),
+                  const SizedBox(height: 16),
+                ],
               ],
-            ],
+            ),
           );
         },
       ),
@@ -96,6 +126,36 @@ class _ProgressTile extends StatelessWidget {
               value: progressValue,
               minHeight: 10,
               borderRadius: BorderRadius.circular(12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String message;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () async => onRetry(),
+              child: const Text('Reintentar'),
             ),
           ],
         ),

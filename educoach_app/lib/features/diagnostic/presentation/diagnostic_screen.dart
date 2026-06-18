@@ -8,23 +8,40 @@ class DiagnosticScreen extends StatefulWidget {
     super.key,
     required this.api,
     required this.session,
+    required this.onUnauthorized,
   });
 
   final EduCoachApi api;
   final AuthSession session;
+  final Future<void> Function() onUnauthorized;
 
   @override
   State<DiagnosticScreen> createState() => _DiagnosticScreenState();
 }
 
 class _DiagnosticScreenState extends State<DiagnosticScreen> {
-  late final Future<List<DiagnosticQuestion>> _questionsFuture =
-      widget.api.getDiagnosticQuestions(widget.session.token);
+  late Future<List<DiagnosticQuestion>> _questionsFuture;
 
   final Map<String, String> _selectedAnswers = {};
   int _currentIndex = 0;
   bool _isSubmitting = false;
   List<DiagnosticTopicResult>? _results;
+
+  @override
+  void initState() {
+    super.initState();
+    _questionsFuture = widget.api.getDiagnosticQuestions(widget.session.token);
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _selectedAnswers.clear();
+      _currentIndex = 0;
+      _results = null;
+      _questionsFuture = widget.api.getDiagnosticQuestions(widget.session.token);
+    });
+    await _questionsFuture;
+  }
 
   Future<void> _submit(List<DiagnosticQuestion> questions) async {
     if (_selectedAnswers.length != questions.length) {
@@ -58,6 +75,10 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
       if (!mounted) {
         return;
       }
+      if (error is ApiException && error.statusCode == 401) {
+        await widget.onUnauthorized();
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error.toString())),
       );
@@ -80,7 +101,16 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text(snapshot.error.toString()));
+            final error = snapshot.error;
+            if (error is ApiException && error.statusCode == 401) {
+              WidgetsBinding.instance.addPostFrameCallback((_) => widget.onUnauthorized());
+              return const Center(child: Text('Sesion expirada. Inicia sesion nuevamente.'));
+            }
+
+            return _ErrorView(
+              message: error.toString(),
+              onRetry: _refresh,
+            );
           }
 
           final questions = snapshot.data ?? const <DiagnosticQuestion>[];
@@ -230,6 +260,36 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String message;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () async => onRetry(),
+              child: const Text('Reintentar'),
+            ),
+          ],
+        ),
       ),
     );
   }

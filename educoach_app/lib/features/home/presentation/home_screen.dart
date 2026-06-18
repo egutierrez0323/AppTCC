@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/api/educoach_api.dart';
 import '../../auth/session_storage.dart';
 import '../../diagnostic/presentation/diagnostic_screen.dart';
+import '../../practice/presentation/practice_history_screen.dart';
 import '../../practice/presentation/practice_screen.dart';
 import '../../progress/presentation/progress_screen.dart';
 
@@ -20,12 +21,22 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Future<void> handleUnauthorized() async {
+      await onLogout();
+      if (!context.mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('EduCoach'),
         actions: [
           IconButton(
-            onPressed: () async => onLogout(),
+            onPressed: () async {
+              await onLogout();
+              if (!context.mounted) return;
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            },
             icon: const Icon(Icons.logout),
             tooltip: 'Cerrar sesion',
           ),
@@ -58,12 +69,13 @@ class HomeScreen extends StatelessWidget {
             subtitle: 'Realiza la prueba inicial y asigna nivel por tema.',
             icon: Icons.quiz_outlined,
             actionLabel: 'Iniciar diagnostico',
-            onTap: () {
+            onTap: () async {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => DiagnosticScreen(
                     api: api,
                     session: session,
+                    onUnauthorized: handleUnauthorized,
                   ),
                 ),
               );
@@ -75,12 +87,64 @@ class HomeScreen extends StatelessWidget {
             subtitle: 'Responde ejercicios por tema y nivel.',
             icon: Icons.edit_note_outlined,
             actionLabel: 'Practicar',
-            onTap: () {
+            onTap: () async {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => PracticeScreen(
                     api: api,
                     session: session,
+                    onUnauthorized: handleUnauthorized,
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          _FeatureCard(
+            title: 'Practica recomendada',
+            subtitle: 'Retoma el tema con menor precision para reforzarlo.',
+            icon: Icons.auto_awesome_outlined,
+            actionLabel: 'Empezar',
+            onTap: () async {
+              try {
+                final recommendation = await api.getPracticeRecommendation(session.token);
+                if (!context.mounted) return;
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => PracticeScreen(
+                      api: api,
+                      session: session,
+                      onUnauthorized: handleUnauthorized,
+                      initialTopicId: recommendation.topicId,
+                      initialLevel: recommendation.recommendedLevel,
+                    ),
+                  ),
+                );
+              } catch (e) {
+                if (e is ApiException && e.statusCode == 401) {
+                  await handleUnauthorized();
+                  return;
+                }
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(e.toString())),
+                );
+              }
+            },
+          ),
+          const SizedBox(height: 16),
+          _FeatureCard(
+            title: 'Historial de practicas',
+            subtitle: 'Revisa tus sesiones anteriores y errores cometidos.',
+            icon: Icons.history_outlined,
+            actionLabel: 'Ver historial',
+            onTap: () async {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => PracticeHistoryScreen(
+                    api: api,
+                    session: session,
+                    onUnauthorized: handleUnauthorized,
                   ),
                 ),
               );
@@ -92,12 +156,13 @@ class HomeScreen extends StatelessWidget {
             subtitle: 'Visualiza nivel, aciertos y racha actual.',
             icon: Icons.bar_chart_outlined,
             actionLabel: 'Ver progreso',
-            onTap: () {
+            onTap: () async {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => ProgressScreen(
                     api: api,
                     session: session,
+                    onUnauthorized: handleUnauthorized,
                   ),
                 ),
               );
@@ -122,7 +187,7 @@ class _FeatureCard extends StatelessWidget {
   final String subtitle;
   final IconData icon;
   final String actionLabel;
-  final VoidCallback onTap;
+  final Future<void> Function() onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -144,7 +209,7 @@ class _FeatureCard extends StatelessWidget {
             Text(subtitle),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: onTap,
+              onPressed: () async => onTap(),
               child: Text(actionLabel),
             ),
           ],

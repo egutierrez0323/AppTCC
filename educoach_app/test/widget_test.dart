@@ -60,4 +60,25 @@ class FakeEduCoachApi implements EduCoachApi {
   ) {
     throw UnimplementedError();
   }
+
+  @override
+  Future<List<PracticeSessionSummary>> getPracticeHistory(
+    String token, {
+    int limit = 20,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<PracticeSessionDetail> getPracticeSessionDetail(
+    String token,
+    String sessionId,
+  ) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<PracticeRecommendation> getPracticeRecommendation(String token) {
+    throw UnimplementedError();
+  }
 }

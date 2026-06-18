@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -18,6 +19,9 @@ abstract class EduCoachApi {
     PracticeAnswerSubmission submission,
   );
   Future<List<ProgressTopic>> getProgress(String token);
+  Future<List<PracticeSessionSummary>> getPracticeHistory(String token, {int limit = 20});
+  Future<PracticeSessionDetail> getPracticeSessionDetail(String token, String sessionId);
+  Future<PracticeRecommendation> getPracticeRecommendation(String token);
 }
 
 class HttpEduCoachApi implements EduCoachApi {
@@ -114,20 +118,57 @@ class HttpEduCoachApi implements EduCoachApi {
         .toList();
   }
 
+  @override
+  Future<List<PracticeSessionSummary>> getPracticeHistory(String token, {int limit = 20}) async {
+    final response = await _get('/practice/history?limit=$limit', token: token);
+    final sessions = response['sessions'] as List<dynamic>;
+    return sessions
+        .map((item) => PracticeSessionSummary.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  @override
+  Future<PracticeSessionDetail> getPracticeSessionDetail(String token, String sessionId) async {
+    final response = await _get('/practice/sessions/$sessionId', token: token);
+    return PracticeSessionDetail.fromJson(response);
+  }
+
+  @override
+  Future<PracticeRecommendation> getPracticeRecommendation(String token) async {
+    final response = await _get('/practice/recommendation', token: token);
+    return PracticeRecommendation.fromJson(response);
+  }
+
   Future<Map<String, dynamic>> _get(String path, {String? token}) async {
-    final response = await _client.get(
-      Uri.parse('$baseUrl$path'),
-      headers: _headers(token),
-    );
-    return _decodeObject(response);
+    try {
+      final response = await _client
+          .get(
+            Uri.parse('$baseUrl$path'),
+            headers: _headers(token),
+          )
+          .timeout(const Duration(seconds: 15));
+      return _decodeObject(response);
+    } on TimeoutException {
+      throw const ApiException('Tiempo de espera agotado. Intenta de nuevo.');
+    } catch (_) {
+      throw const ApiException('No se pudo conectar al servidor. Verifica tu conexion.');
+    }
   }
 
   Future<List<dynamic>> _getList(String path, {String? token}) async {
-    final response = await _client.get(
-      Uri.parse('$baseUrl$path'),
-      headers: _headers(token),
-    );
-    return _decodeList(response);
+    try {
+      final response = await _client
+          .get(
+            Uri.parse('$baseUrl$path'),
+            headers: _headers(token),
+          )
+          .timeout(const Duration(seconds: 15));
+      return _decodeList(response);
+    } on TimeoutException {
+      throw const ApiException('Tiempo de espera agotado. Intenta de nuevo.');
+    } catch (_) {
+      throw const ApiException('No se pudo conectar al servidor. Verifica tu conexion.');
+    }
   }
 
   Future<Map<String, dynamic>> _post(
@@ -135,12 +176,20 @@ class HttpEduCoachApi implements EduCoachApi {
     String? token,
     required Map<String, dynamic> body,
   }) async {
-    final response = await _client.post(
-      Uri.parse('$baseUrl$path'),
-      headers: _headers(token),
-      body: jsonEncode(body),
-    );
-    return _decodeObject(response);
+    try {
+      final response = await _client
+          .post(
+            Uri.parse('$baseUrl$path'),
+            headers: _headers(token),
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 20));
+      return _decodeObject(response);
+    } on TimeoutException {
+      throw const ApiException('Tiempo de espera agotado. Intenta de nuevo.');
+    } catch (_) {
+      throw const ApiException('No se pudo conectar al servidor. Verifica tu conexion.');
+    }
   }
 
   Map<String, String> _headers(String? token) {
@@ -157,7 +206,7 @@ class HttpEduCoachApi implements EduCoachApi {
       final message = body is Map<String, dynamic>
           ? (body['message'] as String? ?? 'Ocurrio un error al procesar la solicitud.')
           : 'Ocurrio un error al procesar la solicitud.';
-      throw ApiException(message);
+      throw ApiException(message, statusCode: response.statusCode);
     }
 
     if (body is Map<String, dynamic>) {
@@ -178,7 +227,7 @@ class HttpEduCoachApi implements EduCoachApi {
       final message = body is Map<String, dynamic>
           ? (body['message'] as String? ?? 'Ocurrio un error al procesar la solicitud.')
           : 'Ocurrio un error al procesar la solicitud.';
-      throw ApiException(message);
+      throw ApiException(message, statusCode: response.statusCode);
     }
 
     if (body is List<dynamic>) {
@@ -199,9 +248,10 @@ class HttpEduCoachApi implements EduCoachApi {
 }
 
 class ApiException implements Exception {
-  const ApiException(this.message);
+  const ApiException(this.message, {this.statusCode});
 
   final String message;
+  final int? statusCode;
 
   @override
   String toString() => message;
@@ -438,6 +488,134 @@ class ProgressTopic {
       totalAttempts: json['totalAttempts'] as int,
       accuracyPercentage: (json['accuracyPercentage'] as num).toDouble(),
       streakDays: json['streakDays'] as int,
+    );
+  }
+}
+
+class PracticeSessionSummary {
+  const PracticeSessionSummary({
+    required this.sessionId,
+    required this.topicId,
+    required this.topicName,
+    required this.difficultyLevel,
+    required this.correctCount,
+    required this.totalCount,
+    required this.startedAtUtc,
+    this.endedAtUtc,
+  });
+
+  final String sessionId;
+  final int topicId;
+  final String topicName;
+  final int difficultyLevel;
+  final int correctCount;
+  final int totalCount;
+  final DateTime startedAtUtc;
+  final DateTime? endedAtUtc;
+
+  factory PracticeSessionSummary.fromJson(Map<String, dynamic> json) {
+    return PracticeSessionSummary(
+      sessionId: json['sessionId'] as String,
+      topicId: json['topicId'] as int,
+      topicName: json['topicName'] as String,
+      difficultyLevel: json['difficultyLevel'] as int,
+      correctCount: json['correctCount'] as int,
+      totalCount: json['totalCount'] as int,
+      startedAtUtc: DateTime.parse(json['startedAtUtc'] as String),
+      endedAtUtc: json['endedAtUtc'] == null ? null : DateTime.parse(json['endedAtUtc'] as String),
+    );
+  }
+}
+
+class PracticeSessionDetail {
+  const PracticeSessionDetail({
+    required this.sessionId,
+    required this.topicId,
+    required this.topicName,
+    required this.difficultyLevel,
+    required this.correctCount,
+    required this.totalCount,
+    required this.startedAtUtc,
+    this.endedAtUtc,
+    required this.answers,
+  });
+
+  final String sessionId;
+  final int topicId;
+  final String topicName;
+  final int difficultyLevel;
+  final int correctCount;
+  final int totalCount;
+  final DateTime startedAtUtc;
+  final DateTime? endedAtUtc;
+  final List<PracticeSessionAnswer> answers;
+
+  factory PracticeSessionDetail.fromJson(Map<String, dynamic> json) {
+    final answers = json['answers'] as List<dynamic>? ?? const <dynamic>[];
+    return PracticeSessionDetail(
+      sessionId: json['sessionId'] as String,
+      topicId: json['topicId'] as int,
+      topicName: json['topicName'] as String,
+      difficultyLevel: json['difficultyLevel'] as int,
+      correctCount: json['correctCount'] as int,
+      totalCount: json['totalCount'] as int,
+      startedAtUtc: DateTime.parse(json['startedAtUtc'] as String),
+      endedAtUtc: json['endedAtUtc'] == null ? null : DateTime.parse(json['endedAtUtc'] as String),
+      answers: answers
+          .map((item) => PracticeSessionAnswer.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class PracticeSessionAnswer {
+  const PracticeSessionAnswer({
+    required this.questionId,
+    required this.statement,
+    required this.selectedOption,
+    required this.correctOption,
+    required this.isCorrect,
+    this.aiExplanation,
+    required this.answeredAtUtc,
+  });
+
+  final String questionId;
+  final String statement;
+  final String selectedOption;
+  final String correctOption;
+  final bool isCorrect;
+  final String? aiExplanation;
+  final DateTime answeredAtUtc;
+
+  factory PracticeSessionAnswer.fromJson(Map<String, dynamic> json) {
+    return PracticeSessionAnswer(
+      questionId: json['questionId'] as String,
+      statement: json['statement'] as String,
+      selectedOption: json['selectedOption'] as String,
+      correctOption: json['correctOption'] as String,
+      isCorrect: json['isCorrect'] as bool,
+      aiExplanation: json['aiExplanation'] as String?,
+      answeredAtUtc: DateTime.parse(json['answeredAtUtc'] as String),
+    );
+  }
+}
+
+class PracticeRecommendation {
+  const PracticeRecommendation({
+    required this.topicId,
+    required this.topicName,
+    required this.recommendedLevel,
+  });
+
+  final int topicId;
+  final String topicName;
+  final int recommendedLevel;
+
+  factory PracticeRecommendation.fromJson(Map<String, dynamic> json) {
+    return PracticeRecommendation(
+      topicId: json['topicId'] as int,
+      topicName: json['topicName'] as String,
+      recommendedLevel: json['recommendedLevel'] as int,
     );
   }
 }
