@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 
 import '../../../core/api/educoach_api.dart';
+import '../../../core/widgets/app_motion.dart';
+import '../../../core/widgets/mascot_assets.dart';
+import '../../../core/widgets/mascot_state_card.dart';
 import '../../auth/session_storage.dart';
 
 class PracticeScreen extends StatefulWidget {
@@ -34,12 +37,14 @@ class _PracticeScreenState extends State<PracticeScreen> {
   late int _topicId;
   late int _level;
   late Future<List<PracticeTopic>> _topicsFuture;
+  final ScrollController _questionScrollController = ScrollController();
   String _mode = PracticeMode.normal;
   bool _isLoading = false;
   PracticeSessionData? _sessionData;
   PracticeAnswerResult? _summary;
   int _currentIndex = 0;
   String? _selectedOption;
+  String? _sessionNotice;
 
   @override
   void initState() {
@@ -47,6 +52,12 @@ class _PracticeScreenState extends State<PracticeScreen> {
     _topicId = widget.initialTopicId ?? 1;
     _level = widget.initialLevel ?? 1;
     _topicsFuture = _loadTopics();
+  }
+
+  @override
+  void dispose() {
+    _questionScrollController.dispose();
+    super.dispose();
   }
 
   Future<List<PracticeTopic>> _loadTopics() async {
@@ -62,6 +73,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
     setState(() {
       _isLoading = true;
       _summary = null;
+      _sessionNotice = null;
     });
 
     try {
@@ -80,14 +92,9 @@ class _PracticeScreenState extends State<PracticeScreen> {
         _sessionData = session;
         _currentIndex = 0;
         _selectedOption = null;
+        _sessionNotice = session.modeMessage;
       });
 
-      final message = session.modeMessage;
-      if (message != null && message.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
-      }
     } catch (error) {
       if (!mounted) {
         return;
@@ -136,12 +143,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
           return AlertDialog(
             title: Text(result.correct ? 'Respuesta correcta' : 'Respuesta incorrecta'),
             content: SingleChildScrollView(
-              child: result.correct
-                  ? const Text('Buen trabajo. Sigue avanzando.')
-                  : _ExplanationContent(
-                      correctOption: result.correctOption,
-                      explanation: result.explanation,
-                    ),
+              child: _PracticeAnswerFeedback(result: result),
             ),
             actions: [
               TextButton(
@@ -163,10 +165,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
           _selectedOption = null;
         });
       } else {
-        setState(() {
-          _currentIndex += 1;
-          _selectedOption = null;
-        });
+        await _moveToQuestion(_currentIndex + 1);
       }
     } catch (error) {
       if (!mounted) {
@@ -184,6 +183,22 @@ class _PracticeScreenState extends State<PracticeScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<void> _moveToQuestion(int index) async {
+    if (_questionScrollController.hasClients) {
+      await _questionScrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+      );
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _currentIndex = index;
+      _selectedOption = null;
+    });
   }
 
   @override
@@ -210,6 +225,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                     }
 
                     return _PracticeErrorView(
+                      title: 'No pudimos cargar los temas',
                       message: error.toString(),
                       onRetry: _refreshTopics,
                     );
@@ -218,6 +234,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                   final topics = snapshot.data ?? const <PracticeTopic>[];
                   if (topics.isEmpty) {
                     return _PracticeErrorView(
+                      title: 'No hay temas disponibles',
                       message: 'No hay temas disponibles en este momento.',
                       onRetry: _refreshTopics,
                     );
@@ -236,6 +253,10 @@ class _PracticeScreenState extends State<PracticeScreen> {
 
                   return ListView(
                     children: [
+                      AppEntrance(
+                        child: _PracticeSetupHero(mode: _mode),
+                      ),
+                      const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
                         initialValue: _mode,
                         decoration: const InputDecoration(labelText: 'Modo'),
@@ -258,6 +279,25 @@ class _PracticeScreenState extends State<PracticeScreen> {
                         _modeDescription(_mode),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
+                      if (_mode == PracticeMode.review) ...[
+                        const SizedBox(height: 16),
+                        const MascotMessageBanner(
+                          title: 'Repaso inteligente',
+                          message:
+                              'Vamos a priorizar preguntas que ya fallaste en este tema y nivel. Si todavia no hay errores previos, iniciaremos una practica normal.',
+                          imageAsset: MascotAssets.poseThinking,
+                          tone: MascotTone.info,
+                        ),
+                      ] else if (_mode == PracticeMode.mixed) ...[
+                        const SizedBox(height: 16),
+                        const MascotMessageBanner(
+                          title: 'Sesion variada',
+                          message:
+                              'Combina preguntas de varios temas para entrenar de forma mas dinamica sin cambiar de pantalla.',
+                          imageAsset: MascotAssets.books,
+                          tone: MascotTone.info,
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       DropdownButtonFormField<int>(
                         initialValue: effectiveTopicId,
@@ -320,56 +360,118 @@ class _PracticeScreenState extends State<PracticeScreen> {
             : _summary != null
                 ? ListView(
                     children: [
-                      Text(
-                        'Sesion completada',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                      const SizedBox(height: 16),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                      AppEntrance(
+                        child: MascotStateCard(
+                          imageAsset: _summary!.sessionCorrectCount >=
+                                  (_summary!.sessionTotalCount / 2).ceil()
+                              ? MascotAssets.applause
+                              : MascotAssets.wink,
+                          title: 'Sesion completada',
+                          message:
+                              'Buen trabajo. Ya registramos tus resultados y el progreso de esta practica.',
+                          tone: MascotTone.success,
+                          child: Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: 12,
+                            runSpacing: 12,
                             children: [
-                              Text('Modo: ${_modeLabel(session.mode)}'),
-                              Text('Tema: ${session.topicName}'),
-                              Text('Nivel actual: ${_summary!.currentLevel}'),
-                              Text(
-                                'Aciertos: ${_summary!.sessionCorrectCount}/${_summary!.sessionTotalCount}',
+                              _SummaryMetric(
+                                label: 'Modo',
+                                value: _modeLabel(session.mode),
                               ),
-                              Text('Racha: ${_summary!.streakDays} dias'),
+                              _SummaryMetric(
+                                label: 'Tema',
+                                value: session.topicName,
+                              ),
+                              _SummaryMetric(
+                                label: 'Aciertos',
+                                value:
+                                    '${_summary!.sessionCorrectCount}/${_summary!.sessionTotalCount}',
+                              ),
+                              _SummaryMetric(
+                                label: 'Nivel actual',
+                                value: '${_summary!.currentLevel}',
+                              ),
+                              _SummaryMetric(
+                                label: 'Racha',
+                                value: '${_summary!.streakDays} dias',
+                              ),
                             ],
                           ),
                         ),
                       ),
                       const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            _sessionData = null;
-                            _summary = null;
-                            _currentIndex = 0;
-                          });
-                        },
-                        child: const Text('Practicar otra vez'),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                _sessionData = null;
+                                _summary = null;
+                                _currentIndex = 0;
+                                _sessionNotice = null;
+                              });
+                            },
+                            child: const Text('Practicar otra vez'),
+                          ),
+                          OutlinedButton(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                            },
+                            child: const Text('Volver al inicio'),
+                          ),
+                        ],
                       ),
                     ],
                   )
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '${session.topicName} · Nivel ${session.difficultyLevel}',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                      if (_sessionNotice != null && _sessionNotice!.isNotEmpty) ...[
+                        MascotMessageBanner(
+                          title: 'Aviso de la sesion',
+                          message: _sessionNotice!,
+                          imageAsset: session.mode == PracticeMode.review
+                              ? MascotAssets.poseThinking
+                              : MascotAssets.books,
+                          tone: MascotTone.info,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                              const Color(0xFF6EE7F5).withValues(alpha: 0.08),
+                              Colors.white,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${session.topicName} · Nivel ${session.difficultyLevel}',
+                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(_modeLabel(session.mode)),
+                              const SizedBox(height: 8),
+                              Text('Pregunta ${_currentIndex + 1} de ${session.questions.length}'),
+                            ],
+                          ),
+                        ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(_modeLabel(session.mode)),
-                      const SizedBox(height: 8),
-                      Text('Pregunta ${_currentIndex + 1} de ${session.questions.length}'),
                       const SizedBox(height: 12),
                       LinearProgressIndicator(
                         value: (_currentIndex + 1) / session.questions.length,
@@ -377,41 +479,50 @@ class _PracticeScreenState extends State<PracticeScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       const SizedBox(height: 24),
-                      Text(
-                        session.questions[_currentIndex].statement,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                      const SizedBox(height: 20),
                       Expanded(
-                        child: ListView(
-                          children: [
-                            _PracticeOption(
-                              value: 'A',
-                              label: session.questions[_currentIndex].optionA,
-                              isSelected: _selectedOption == 'A',
-                              onChanged: (value) => setState(() => _selectedOption = value),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          switchInCurve: Curves.easeOutCubic,
+                          switchOutCurve: Curves.easeOutCubic,
+                          child: Scrollbar(
+                            key: ValueKey(session.questions[_currentIndex].id),
+                            controller: _questionScrollController,
+                            child: ListView(
+                              controller: _questionScrollController,
+                              children: [
+                                AppEntrance(
+                                  child: _QuestionCard(
+                                    statement: session.questions[_currentIndex].statement,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                _PracticeOption(
+                                  value: 'A',
+                                  label: session.questions[_currentIndex].optionA,
+                                  isSelected: _selectedOption == 'A',
+                                  onChanged: (value) => setState(() => _selectedOption = value),
+                                ),
+                                _PracticeOption(
+                                  value: 'B',
+                                  label: session.questions[_currentIndex].optionB,
+                                  isSelected: _selectedOption == 'B',
+                                  onChanged: (value) => setState(() => _selectedOption = value),
+                                ),
+                                _PracticeOption(
+                                  value: 'C',
+                                  label: session.questions[_currentIndex].optionC,
+                                  isSelected: _selectedOption == 'C',
+                                  onChanged: (value) => setState(() => _selectedOption = value),
+                                ),
+                                _PracticeOption(
+                                  value: 'D',
+                                  label: session.questions[_currentIndex].optionD,
+                                  isSelected: _selectedOption == 'D',
+                                  onChanged: (value) => setState(() => _selectedOption = value),
+                                ),
+                              ],
                             ),
-                            _PracticeOption(
-                              value: 'B',
-                              label: session.questions[_currentIndex].optionB,
-                              isSelected: _selectedOption == 'B',
-                              onChanged: (value) => setState(() => _selectedOption = value),
-                            ),
-                            _PracticeOption(
-                              value: 'C',
-                              label: session.questions[_currentIndex].optionC,
-                              isSelected: _selectedOption == 'C',
-                              onChanged: (value) => setState(() => _selectedOption = value),
-                            ),
-                            _PracticeOption(
-                              value: 'D',
-                              label: session.questions[_currentIndex].optionD,
-                              isSelected: _selectedOption == 'D',
-                              onChanged: (value) => setState(() => _selectedOption = value),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                       ElevatedButton(
@@ -445,28 +556,244 @@ class _PracticeScreenState extends State<PracticeScreen> {
 
 class _PracticeErrorView extends StatelessWidget {
   const _PracticeErrorView({
+    required this.title,
     required this.message,
     required this.onRetry,
   });
 
+  final String title;
   final String message;
   final Future<void> Function() onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: MascotStateCard(
+        imageAsset: MascotAssets.sad,
+        title: title,
+        message: message,
+        tone: MascotTone.error,
+        primaryLabel: 'Reintentar',
+        onPrimaryPressed: () async => onRetry(),
+      ),
+    );
+  }
+}
+
+class _PracticeAnswerFeedback extends StatelessWidget {
+  const _PracticeAnswerFeedback({required this.result});
+
+  final PracticeAnswerResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Center(
+          child: Image.asset(
+            result.correct ? MascotAssets.happy : MascotAssets.poseThinking,
+            height: 110,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return Icon(
+                Icons.calculate_rounded,
+                size: 72,
+                color: Theme.of(context).colorScheme.primary,
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (result.correct)
+          Text(
+            'Buen trabajo. Sigue avanzando.',
+            style: Theme.of(context).textTheme.bodyLarge,
+          )
+        else
+          _ExplanationContent(
+            correctOption: result.correctOption,
+            explanation: result.explanation,
+          ),
+      ],
+    );
+  }
+}
+
+class _SummaryMetric extends StatelessWidget {
+  const _SummaryMetric({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 124),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: const Color(0xFF5B6B7D),
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF12243A),
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PracticeSetupHero extends StatelessWidget {
+  const _PracticeSetupHero({required this.mode});
+
+  final String mode;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageAsset = switch (mode) {
+      PracticeMode.review => MascotAssets.poseThinking,
+      PracticeMode.mixed => MascotAssets.books,
+      _ => MascotAssets.writing,
+    };
+
+    final title = switch (mode) {
+      PracticeMode.review => 'Repasa con enfoque',
+      PracticeMode.mixed => 'Entrena con variedad',
+      _ => 'Prepara tu proxima practica',
+    };
+
+    final message = switch (mode) {
+      PracticeMode.review =>
+        'Escoge tema y nivel para volver sobre los ejercicios donde mas apoyo necesitas.',
+      PracticeMode.mixed =>
+        'Elige el nivel y deja que EduCoach combine preguntas de distintos temas en una sola sesion.',
+      _ => 'Selecciona el tema y el nivel para empezar una sesion clara, corta y enfocada.',
+    };
+
+    return Card(
       child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () async => onRetry(),
-              child: const Text('Reintentar'),
-            ),
-          ],
+        padding: const EdgeInsets.all(20),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final stacked = constraints.maxWidth < 560;
+            final text = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    switch (mode) {
+                      PracticeMode.mixed => 'Practica mixta',
+                      PracticeMode.review => 'Repasar errores',
+                      _ => 'Practica normal',
+                    },
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF12243A),
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: const Color(0xFF425466),
+                        height: 1.4,
+                      ),
+                ),
+              ],
+            );
+
+            final mascot = InteractiveParallax(
+              maxOffset: 6,
+              child: RepaintBoundary(
+                child: Image.asset(
+                  imageAsset,
+                  height: stacked ? 120 : 136,
+                  fit: BoxFit.contain,
+                  cacheWidth: stacked ? 240 : 272,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(
+                      Icons.calculate_rounded,
+                      size: stacked ? 80 : 88,
+                      color: Theme.of(context).colorScheme.primary,
+                    );
+                  },
+                ),
+              ),
+            );
+
+            if (stacked) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(child: mascot),
+                  const SizedBox(height: 16),
+                  text,
+                ],
+              );
+            }
+
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Theme.of(context).colorScheme.primary.withValues(alpha: 0.09),
+                    const Color(0xFF6EE7F5).withValues(alpha: 0.10),
+                    Colors.white,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Row(
+                  children: [
+                    Expanded(child: text),
+                    const SizedBox(width: 16),
+                    mascot,
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -564,14 +891,77 @@ class _PracticeOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: isSelected
-          ? Theme.of(context).colorScheme.primaryContainer
-          : Theme.of(context).cardTheme.color,
-      child: ListTile(
-        title: Text('$value) $label'),
-        trailing: isSelected ? const Icon(Icons.check_circle) : null,
-        onTap: () => onChanged(value),
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return HoverLift(
+      onTap: () => onChanged(value),
+      lift: 3,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? colorScheme.primary.withValues(alpha: 0.32)
+                : Colors.blueGrey.withValues(alpha: 0.10),
+          ),
+          gradient: LinearGradient(
+            colors: isSelected
+                ? [
+                    colorScheme.primary.withValues(alpha: 0.12),
+                    colorScheme.secondary.withValues(alpha: 0.08),
+                    Colors.white,
+                  ]
+                : [Colors.white, Colors.white],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: ListTile(
+            title: Text('$value) $label'),
+            trailing: isSelected
+                ? Icon(Icons.check_circle, color: colorScheme.primary)
+                : Icon(Icons.arrow_forward_ios_rounded, size: 16, color: colorScheme.primary),
+            onTap: () => onChanged(value),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuestionCard extends StatelessWidget {
+  const _QuestionCard({required this.statement});
+
+  final String statement;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.07),
+            const Color(0xFF6EE7F5).withValues(alpha: 0.08),
+            Colors.white,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Text(
+          statement,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+        ),
       ),
     );
   }

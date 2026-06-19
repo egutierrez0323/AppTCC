@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'core/api/educoach_api.dart';
 import 'core/config/app_config.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/app_motion.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/session_storage.dart';
 import 'features/home/presentation/home_screen.dart';
@@ -63,6 +64,7 @@ class _EduCoachAppState extends State<EduCoachApp> {
       title: 'EduCoach',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.build(),
+      scrollBehavior: const AppScrollBehavior(),
       home: _session == null
           ? LoginScreen(
               onLogin: _login,

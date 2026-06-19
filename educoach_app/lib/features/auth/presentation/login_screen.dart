@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/app_motion.dart';
+import '../../../core/widgets/mascot_assets.dart';
+import '../../../core/widgets/mascot_state_card.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
     super.key,
@@ -99,76 +103,173 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 460),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'EduCoach',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
+              child: SingleChildScrollView(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      AppEntrance(
+                        child: InteractiveParallax(
+                          maxOffset: 8,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.10),
+                                  const Color(0xFF6EE7F5).withValues(alpha: 0.12),
+                                  Colors.white,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(28),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(18),
+                              child: Column(
+                                children: [
+                                  RepaintBoundary(
+                                    child: Image.asset(
+                                      MascotAssets.poseGreeting,
+                                      height: 170,
+                                      fit: BoxFit.contain,
+                                      cacheWidth: 340,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return Icon(
+                                          Icons.calculate_rounded,
+                                          size: 120,
+                                          color: Theme.of(context).colorScheme.primary,
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Container(
+                                    padding:
+                                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(999),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.04),
+                                          blurRadius: 20,
+                                          offset: const Offset(0, 10),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Text(
+                                      'Tu compañero de matematicas',
+                                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                            color: Theme.of(context).colorScheme.primary,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Refuerzo academico en matematicas para secundaria.',
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
-                    const SizedBox(height: 32),
-                    if (_errorMessage != null) ...[
-                      Text(
-                        _errorMessage!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
                         ),
                       ),
+                      const SizedBox(height: 24),
+                      const AppEntrance(
+                        delay: Duration(milliseconds: 60),
+                        child: _LoginHeadline(),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Refuerzo academico en matematicas para secundaria con practica guiada y explicaciones claras.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              color: const Color(0xFF5B6B7D),
+                              height: 1.4,
+                            ),
+                      ),
+                      const SizedBox(height: 32),
+                      if (_errorMessage != null) ...[
+                        MascotMessageBanner(
+                          title: 'No pudimos iniciar sesion',
+                          message: _errorMessage!,
+                          imageAsset: MascotAssets.worried,
+                          tone: MascotTone.error,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(labelText: 'Email'),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Ingresa tu email';
+                          }
+                          if (!value.contains('@')) {
+                            return 'Ingresa un email valido';
+                          }
+                          return null;
+                        },
+                      ),
                       const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: true,
+                        decoration: const InputDecoration(labelText: 'Contrasena'),
+                        validator: (value) {
+                          if (value == null || value.length < 6) {
+                            return 'Minimo 6 caracteres';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: _isSubmitting ? null : _submit,
+                        child: Text(_isSubmitting ? 'Ingresando...' : 'Iniciar sesion'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: _isSubmitting ? null : _openRegisterModal,
+                        child: const Text('Crear cuenta'),
+                      ),
                     ],
-                    TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(labelText: 'Email'),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Ingresa tu email';
-                        }
-                        if (!value.contains('@')) {
-                          return 'Ingresa un email valido';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: true,
-                      decoration: const InputDecoration(labelText: 'Contrasena'),
-                      validator: (value) {
-                        if (value == null || value.length < 6) {
-                          return 'Minimo 6 caracteres';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _isSubmitting ? null : _submit,
-                      child: Text(_isSubmitting ? 'Ingresando...' : 'Iniciar sesion'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: _isSubmitting ? null : _openRegisterModal,
-                      child: const Text('Crear cuenta'),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _LoginHeadline extends StatelessWidget {
+  const _LoginHeadline();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          'EduCoach',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'Inicia sesion y entra a una experiencia mas fluida, clara y dinamica para practicar matematicas.',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: const Color(0xFF5B6B7D),
+                height: 1.35,
+              ),
+        ),
+      ],
     );
   }
 }

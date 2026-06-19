@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 
 import '../../../core/api/educoach_api.dart';
+import '../../../core/widgets/app_motion.dart';
+import '../../../core/widgets/mascot_assets.dart';
+import '../../../core/widgets/mascot_state_card.dart';
 import '../../auth/session_storage.dart';
 
 class PracticeSessionDetailScreen extends StatefulWidget {
@@ -53,6 +56,7 @@ class _PracticeSessionDetailScreenState extends State<PracticeSessionDetailScree
             }
 
             return _ErrorView(
+              title: 'No pudimos cargar la sesion',
               message: error.toString(),
               onRetry: _refresh,
             );
@@ -67,71 +71,86 @@ class _PracticeSessionDetailScreenState extends State<PracticeSessionDetailScree
 
           return RefreshIndicator(
             onRefresh: _refresh,
-            child: ListView(
-              padding: const EdgeInsets.all(24),
-              children: [
-                Text(
-                  '${detail.topicName} · Nivel ${detail.difficultyLevel}',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                const SizedBox(height: 12),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            child: Scrollbar(
+              child: ListView(
+                padding: const EdgeInsets.all(24),
+                children: [
+                  MascotStateCard(
+                    imageAsset: incorrect.isEmpty ? MascotAssets.applause : MascotAssets.poseThinking,
+                    title: '${detail.topicName} · Nivel ${detail.difficultyLevel}',
+                    message: incorrect.isEmpty
+                        ? 'Excelente trabajo. En esta sesion no hubo errores y tu progreso quedo registrado.'
+                        : 'Aqui puedes repasar con calma las respuestas que fallaste y entender mejor cada solucion.',
+                    tone: incorrect.isEmpty ? MascotTone.success : MascotTone.info,
+                    centered: false,
+                    imageSize: 120,
+                    child: Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
                       children: [
-                        Text('Aciertos: ${detail.correctCount}/${detail.totalCount}'),
-                        Text('Respuestas: ${detail.answers.length}'),
+                        _DetailMetric(
+                          label: 'Aciertos',
+                          value: '${detail.correctCount}/${detail.totalCount}',
+                        ),
+                        _DetailMetric(
+                          label: 'Respuestas',
+                          value: '${detail.answers.length}',
+                        ),
+                        _DetailMetric(
+                          label: 'Errores',
+                          value: '${incorrect.length}',
+                        ),
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Respuestas incorrectas',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                const SizedBox(height: 12),
-                if (incorrect.isEmpty)
-                  const Card(
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Text('No hay errores en esta sesion.'),
-                    ),
-                  )
-                else
-                  for (final answer in incorrect) ...[
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              answer.statement,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Respuestas incorrectas',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (incorrect.isEmpty)
+                    const MascotStateCard(
+                      imageAsset: MascotAssets.happy,
+                      title: 'No hay errores en esta sesion',
+                      message:
+                          'Aprovecha este resultado para continuar con practica mixta o subir de nivel en tu siguiente sesion.',
+                      tone: MascotTone.success,
+                      imageSize: 110,
+                    )
+                  else
+                    for (final answer in incorrect) ...[
+                      HoverLift(
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  answer.statement,
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text('Tu respuesta: ${answer.selectedOption}'),
+                                Text('Correcta: ${answer.correctOption}'),
+                                if (answer.aiExplanation != null) ...[
+                                  const SizedBox(height: 8),
+                                  _StoredExplanationView(explanation: answer.aiExplanation!),
+                                ],
+                              ],
                             ),
-                            const SizedBox(height: 8),
-                            Text('Tu respuesta: ${answer.selectedOption}'),
-                            Text('Correcta: ${answer.correctOption}'),
-                            if (answer.aiExplanation != null) ...[
-                              const SizedBox(height: 8),
-                              _StoredExplanationView(explanation: answer.aiExplanation!),
-                            ],
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-              ],
+                      const SizedBox(height: 12),
+                    ],
+                ],
+              ),
             ),
           );
         },
@@ -193,29 +212,67 @@ class _StoredExplanationView extends StatelessWidget {
 
 class _ErrorView extends StatelessWidget {
   const _ErrorView({
+    required this.title,
     required this.message,
     required this.onRetry,
   });
 
+  final String title;
   final String message;
   final Future<void> Function() onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () async => onRetry(),
-              child: const Text('Reintentar'),
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: MascotStateCard(
+        imageAsset: MascotAssets.sad,
+        title: title,
+        message: message,
+        tone: MascotTone.error,
+        primaryLabel: 'Reintentar',
+        onPrimaryPressed: () async => onRetry(),
+      ),
+    );
+  }
+}
+
+class _DetailMetric extends StatelessWidget {
+  const _DetailMetric({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: const Color(0xFF5B6B7D),
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF12243A),
+                ),
+          ),
+        ],
       ),
     );
   }

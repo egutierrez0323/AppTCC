@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/api/educoach_api.dart';
+import '../../../core/widgets/app_motion.dart';
+import '../../../core/widgets/mascot_assets.dart';
+import '../../../core/widgets/mascot_state_card.dart';
 import '../../auth/session_storage.dart';
 
 class DiagnosticScreen extends StatefulWidget {
@@ -23,9 +26,11 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
   late Future<List<DiagnosticQuestion>> _questionsFuture;
 
   final Map<String, String> _selectedAnswers = {};
+  final ScrollController _optionsScrollController = ScrollController();
   int _currentIndex = 0;
   bool _isSubmitting = false;
   List<DiagnosticTopicResult>? _results;
+  String? _submitErrorMessage;
 
   @override
   void initState() {
@@ -33,11 +38,18 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
     _questionsFuture = widget.api.getDiagnosticQuestions(widget.session.token);
   }
 
+  @override
+  void dispose() {
+    _optionsScrollController.dispose();
+    super.dispose();
+  }
+
   Future<void> _refresh() async {
     setState(() {
       _selectedAnswers.clear();
       _currentIndex = 0;
       _results = null;
+      _submitErrorMessage = null;
       _questionsFuture = widget.api.getDiagnosticQuestions(widget.session.token);
     });
     await _questionsFuture;
@@ -51,7 +63,10 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
       return;
     }
 
-    setState(() => _isSubmitting = true);
+    setState(() {
+      _isSubmitting = true;
+      _submitErrorMessage = null;
+    });
 
     try {
       final results = await widget.api.submitDiagnostic(
@@ -79,14 +94,25 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
         await widget.onUnauthorized();
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
-      );
+      setState(() => _submitErrorMessage = error.toString());
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
       }
     }
+  }
+
+  Future<void> _moveToQuestion(int index) async {
+    if (_optionsScrollController.hasClients) {
+      await _optionsScrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+      );
+    }
+
+    if (!mounted) return;
+    setState(() => _currentIndex = index);
   }
 
   @override
@@ -108,6 +134,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
             }
 
             return _ErrorView(
+              title: 'No pudimos cargar el diagnostico',
               message: error.toString(),
               onRetry: _refresh,
             );
@@ -115,33 +142,84 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
 
           final questions = snapshot.data ?? const <DiagnosticQuestion>[];
           if (questions.isEmpty) {
-            return const Center(child: Text('No hay preguntas disponibles.'));
+            return Padding(
+              padding: const EdgeInsets.all(24),
+              child: MascotStateCard(
+                imageAsset: MascotAssets.reading,
+                title: 'No hay preguntas disponibles',
+                message:
+                    'Todavia no encontramos preguntas de diagnostico. Intenta de nuevo en unos minutos.',
+                tone: MascotTone.warning,
+                primaryLabel: 'Reintentar',
+                onPrimaryPressed: _refresh,
+              ),
+            );
           }
 
           if (_results != null) {
-            return ListView(
-              padding: const EdgeInsets.all(24),
-              children: [
-                Text(
-                  'Resultados del diagnostico',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
+            final totalQuestions = _results!.fold<int>(
+              0,
+              (sum, result) => sum + result.totalQuestions,
+            );
+            final totalCorrect = _results!.fold<int>(
+              0,
+              (sum, result) => sum + result.score,
+            );
+
+            return Scrollbar(
+              child: ListView(
+                padding: const EdgeInsets.all(24),
+                children: [
+                  AppEntrance(
+                    child: MascotStateCard(
+                      imageAsset: MascotAssets.celebrate,
+                      title: 'Diagnostico completado',
+                      message:
+                          'Ya tenemos una base para recomendarte ejercicios y seguir tu avance por tema.',
+                      tone: MascotTone.success,
+                      primaryLabel: 'Repetir diagnostico',
+                      onPrimaryPressed: _refresh,
+                      child: Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          _ResultPill(
+                            label: 'Aciertos totales',
+                            value: '$totalCorrect/$totalQuestions',
+                          ),
+                          _ResultPill(
+                            label: 'Temas evaluados',
+                            value: '${_results!.length}',
+                          ),
+                        ],
                       ),
-                ),
-                const SizedBox(height: 16),
-                for (final result in _results!) ...[
-                  Card(
-                    child: ListTile(
-                      title: Text(result.topicName),
-                      subtitle: Text(
-                        'Aciertos: ${result.score}/${result.totalQuestions}',
-                      ),
-                      trailing: Text('Nivel ${result.assignedLevel}'),
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Resultado por tema',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
                   const SizedBox(height: 12),
+                  for (final result in _results!) ...[
+                    HoverLift(
+                      child: Card(
+                        child: ListTile(
+                          title: Text(result.topicName),
+                          subtitle: Text(
+                            'Aciertos: ${result.score}/${result.totalQuestions}',
+                          ),
+                          trailing: Text('Nivel ${result.assignedLevel}'),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                 ],
-              ],
+              ),
             );
           }
 
@@ -162,55 +240,69 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                   minHeight: 10,
                   borderRadius: BorderRadius.circular(12),
                 ),
+                if (_submitErrorMessage != null) ...[
+                  const SizedBox(height: 16),
+                  MascotMessageBanner(
+                    title: 'No pudimos enviar tus respuestas',
+                    message: _submitErrorMessage!,
+                    imageAsset: MascotAssets.worried,
+                    tone: MascotTone.error,
+                  ),
+                ],
                 const SizedBox(height: 24),
-                Text(
-                  '${question.topicName} · Nivel ${question.difficultyLevel}',
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  question.statement,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                const SizedBox(height: 20),
                 Expanded(
-                  child: ListView(
-                    children: [
-                      _AnswerOption(
-                        value: 'A',
-                        isSelected: _selectedAnswers[question.id] == 'A',
-                        label: question.optionA,
-                        onChanged: (value) {
-                          setState(() => _selectedAnswers[question.id] = value);
-                        },
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeOutCubic,
+                    child: Scrollbar(
+                      key: ValueKey(question.id),
+                      controller: _optionsScrollController,
+                      child: ListView(
+                        controller: _optionsScrollController,
+                        children: [
+                          AppEntrance(
+                            child: _QuestionPanel(
+                              header: '${question.topicName} · Nivel ${question.difficultyLevel}',
+                              statement: question.statement,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          _AnswerOption(
+                            value: 'A',
+                            isSelected: _selectedAnswers[question.id] == 'A',
+                            label: question.optionA,
+                            onChanged: (value) {
+                              setState(() => _selectedAnswers[question.id] = value);
+                            },
+                          ),
+                          _AnswerOption(
+                            value: 'B',
+                            isSelected: _selectedAnswers[question.id] == 'B',
+                            label: question.optionB,
+                            onChanged: (value) {
+                              setState(() => _selectedAnswers[question.id] = value);
+                            },
+                          ),
+                          _AnswerOption(
+                            value: 'C',
+                            isSelected: _selectedAnswers[question.id] == 'C',
+                            label: question.optionC,
+                            onChanged: (value) {
+                              setState(() => _selectedAnswers[question.id] = value);
+                            },
+                          ),
+                          _AnswerOption(
+                            value: 'D',
+                            isSelected: _selectedAnswers[question.id] == 'D',
+                            label: question.optionD,
+                            onChanged: (value) {
+                              setState(() => _selectedAnswers[question.id] = value);
+                            },
+                          ),
+                        ],
                       ),
-                      _AnswerOption(
-                        value: 'B',
-                        isSelected: _selectedAnswers[question.id] == 'B',
-                        label: question.optionB,
-                        onChanged: (value) {
-                          setState(() => _selectedAnswers[question.id] = value);
-                        },
-                      ),
-                      _AnswerOption(
-                        value: 'C',
-                        isSelected: _selectedAnswers[question.id] == 'C',
-                        label: question.optionC,
-                        onChanged: (value) {
-                          setState(() => _selectedAnswers[question.id] = value);
-                        },
-                      ),
-                      _AnswerOption(
-                        value: 'D',
-                        isSelected: _selectedAnswers[question.id] == 'D',
-                        label: question.optionD,
-                        onChanged: (value) {
-                          setState(() => _selectedAnswers[question.id] = value);
-                        },
-                      ),
-                    ],
+                    ),
                   ),
                 ),
                 Row(
@@ -218,9 +310,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                     if (_currentIndex > 0)
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: () {
-                            setState(() => _currentIndex -= 1);
-                          },
+                          onPressed: () => _moveToQuestion(_currentIndex - 1),
                           child: const Text('Anterior'),
                         ),
                       ),
@@ -242,7 +332,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                                 if (_currentIndex == questions.length - 1) {
                                   _submit(questions);
                                 } else {
-                                  setState(() => _currentIndex += 1);
+                                  _moveToQuestion(_currentIndex + 1);
                                 }
                               },
                         child: Text(
@@ -267,32 +357,70 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
 
 class _ErrorView extends StatelessWidget {
   const _ErrorView({
+    required this.title,
     required this.message,
     required this.onRetry,
   });
 
+  final String title;
   final String message;
   final Future<void> Function() onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () async => onRetry(),
-              child: const Text('Reintentar'),
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: MascotStateCard(
+        imageAsset: MascotAssets.sad,
+        title: title,
+        message: message,
+        tone: MascotTone.error,
+        primaryLabel: 'Reintentar',
+        onPrimaryPressed: () async => onRetry(),
       ),
     );
   }
+}
+
+class _ResultPill extends StatelessWidget {
+  const _ResultPill({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: const Color(0xFF5B6B7D),
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF12243A),
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
 }
 
 class _AnswerOption extends StatelessWidget {
@@ -310,14 +438,96 @@ class _AnswerOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: isSelected
-          ? Theme.of(context).colorScheme.primaryContainer
-          : Theme.of(context).cardTheme.color,
-      child: ListTile(
-        title: Text('$value) $label'),
-        trailing: isSelected ? const Icon(Icons.check_circle) : null,
-        onTap: () => onChanged(value),
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return HoverLift(
+      onTap: () => onChanged(value),
+      lift: 3,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? colorScheme.primary.withValues(alpha: 0.32)
+                : Colors.blueGrey.withValues(alpha: 0.10),
+          ),
+          gradient: LinearGradient(
+            colors: isSelected
+                ? [
+                    colorScheme.primary.withValues(alpha: 0.12),
+                    colorScheme.secondary.withValues(alpha: 0.08),
+                    Colors.white,
+                  ]
+                : [
+                    Colors.white,
+                    Colors.white,
+                  ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: ListTile(
+            title: Text('$value) $label'),
+            trailing: isSelected
+                ? Icon(Icons.check_circle, color: colorScheme.primary)
+                : Icon(Icons.arrow_forward_ios_rounded, size: 16, color: colorScheme.primary),
+            onTap: () => onChanged(value),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuestionPanel extends StatelessWidget {
+  const _QuestionPanel({
+    required this.header,
+    required this.statement,
+  });
+
+  final String header;
+  final String statement;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+            const Color(0xFF6EE7F5).withValues(alpha: 0.08),
+            Colors.white,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              header,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: const Color(0xFF425466),
+                  ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              statement,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+          ],
+        ),
       ),
     );
   }
