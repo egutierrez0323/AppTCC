@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/api/educoach_api.dart';
-import '../../../core/widgets/app_motion.dart';
 import '../../../core/widgets/mascot_assets.dart';
 import '../../../core/widgets/mascot_state_card.dart';
 import '../../auth/session_storage.dart';
@@ -160,32 +159,30 @@ class _ProgressTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final progressValue = topic.accuracyPercentage.clamp(0, 100) / 100;
 
-    return HoverLift(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                topic.topicName,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Text('Nivel actual: ${topic.currentLevel}'),
-              Text('Aciertos: ${topic.totalCorrect}/${topic.totalAttempts}'),
-              Text('Precision: ${topic.accuracyPercentage.toStringAsFixed(2)}%'),
-              Text('Racha: ${topic.streakDays} dias'),
-              const SizedBox(height: 12),
-              LinearProgressIndicator(
-                value: progressValue,
-                minHeight: 10,
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ],
-          ),
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              topic.topicName,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text('Nivel actual: ${topic.currentLevel}'),
+            Text('Aciertos: ${topic.totalCorrect}/${topic.totalAttempts}'),
+            Text('Precision: ${topic.accuracyPercentage.toStringAsFixed(2)}%'),
+            Text('Racha: ${topic.streakDays} dias'),
+            const SizedBox(height: 12),
+            LinearProgressIndicator(
+              value: progressValue,
+              minHeight: 10,
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ],
         ),
       ),
     );

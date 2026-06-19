@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 
 import '../../../core/api/educoach_api.dart';
-import '../../../core/widgets/app_motion.dart';
 import '../../../core/widgets/mascot_assets.dart';
 import '../../../core/widgets/mascot_state_card.dart';
 import '../../auth/session_storage.dart';
@@ -253,9 +252,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
 
                   return ListView(
                     children: [
-                      AppEntrance(
-                        child: _PracticeSetupHero(mode: _mode),
-                      ),
+                      _PracticeSetupHero(mode: _mode),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
                         initialValue: _mode,
@@ -360,44 +357,42 @@ class _PracticeScreenState extends State<PracticeScreen> {
             : _summary != null
                 ? ListView(
                     children: [
-                      AppEntrance(
-                        child: MascotStateCard(
-                          imageAsset: _summary!.sessionCorrectCount >=
-                                  (_summary!.sessionTotalCount / 2).ceil()
-                              ? MascotAssets.applause
-                              : MascotAssets.wink,
-                          title: 'Sesion completada',
-                          message:
-                              'Buen trabajo. Ya registramos tus resultados y el progreso de esta practica.',
-                          tone: MascotTone.success,
-                          child: Wrap(
-                            alignment: WrapAlignment.center,
-                            spacing: 12,
-                            runSpacing: 12,
-                            children: [
-                              _SummaryMetric(
-                                label: 'Modo',
-                                value: _modeLabel(session.mode),
-                              ),
-                              _SummaryMetric(
-                                label: 'Tema',
-                                value: session.topicName,
-                              ),
-                              _SummaryMetric(
-                                label: 'Aciertos',
-                                value:
-                                    '${_summary!.sessionCorrectCount}/${_summary!.sessionTotalCount}',
-                              ),
-                              _SummaryMetric(
-                                label: 'Nivel actual',
-                                value: '${_summary!.currentLevel}',
-                              ),
-                              _SummaryMetric(
-                                label: 'Racha',
-                                value: '${_summary!.streakDays} dias',
-                              ),
-                            ],
-                          ),
+                      MascotStateCard(
+                        imageAsset: _summary!.sessionCorrectCount >=
+                                (_summary!.sessionTotalCount / 2).ceil()
+                            ? MascotAssets.applause
+                            : MascotAssets.wink,
+                        title: 'Sesion completada',
+                        message:
+                            'Buen trabajo. Ya registramos tus resultados y el progreso de esta practica.',
+                        tone: MascotTone.success,
+                        child: Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: [
+                            _SummaryMetric(
+                              label: 'Modo',
+                              value: _modeLabel(session.mode),
+                            ),
+                            _SummaryMetric(
+                              label: 'Tema',
+                              value: session.topicName,
+                            ),
+                            _SummaryMetric(
+                              label: 'Aciertos',
+                              value:
+                                  '${_summary!.sessionCorrectCount}/${_summary!.sessionTotalCount}',
+                            ),
+                            _SummaryMetric(
+                              label: 'Nivel actual',
+                              value: '${_summary!.currentLevel}',
+                            ),
+                            _SummaryMetric(
+                              label: 'Racha',
+                              value: '${_summary!.streakDays} dias',
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -440,19 +435,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                         ),
                         const SizedBox(height: 16),
                       ],
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
-                              const Color(0xFF6EE7F5).withValues(alpha: 0.08),
-                              Colors.white,
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(24),
-                        ),
+                      Card(
                         child: Padding(
                           padding: const EdgeInsets.all(18),
                           child: Column(
@@ -461,7 +444,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                               Text(
                                 '${session.topicName} · Nivel ${session.difficultyLevel}',
                                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.w800,
+                                      fontWeight: FontWeight.w700,
                                     ),
                               ),
                               const SizedBox(height: 8),
@@ -490,10 +473,8 @@ class _PracticeScreenState extends State<PracticeScreen> {
                             child: ListView(
                               controller: _questionScrollController,
                               children: [
-                                AppEntrance(
-                                  child: _QuestionCard(
-                                    statement: session.questions[_currentIndex].statement,
-                                  ),
+                                _QuestionCard(
+                                  statement: session.questions[_currentIndex].statement,
                                 ),
                                 const SizedBox(height: 20),
                                 _PracticeOption(
@@ -739,22 +720,19 @@ class _PracticeSetupHero extends StatelessWidget {
               ],
             );
 
-            final mascot = InteractiveParallax(
-              maxOffset: 6,
-              child: RepaintBoundary(
-                child: Image.asset(
-                  imageAsset,
-                  height: stacked ? 120 : 136,
-                  fit: BoxFit.contain,
-                  cacheWidth: stacked ? 240 : 272,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Icon(
-                      Icons.calculate_rounded,
-                      size: stacked ? 80 : 88,
-                      color: Theme.of(context).colorScheme.primary,
-                    );
-                  },
-                ),
+            final mascot = RepaintBoundary(
+              child: Image.asset(
+                imageAsset,
+                height: stacked ? 120 : 136,
+                fit: BoxFit.contain,
+                cacheWidth: stacked ? 240 : 272,
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(
+                    Icons.calculate_rounded,
+                    size: stacked ? 80 : 88,
+                    color: Theme.of(context).colorScheme.primary,
+                  );
+                },
               ),
             );
 
@@ -769,29 +747,12 @@ class _PracticeSetupHero extends StatelessWidget {
               );
             }
 
-            return DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Theme.of(context).colorScheme.primary.withValues(alpha: 0.09),
-                    const Color(0xFF6EE7F5).withValues(alpha: 0.10),
-                    Colors.white,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(6),
-                child: Row(
-                  children: [
-                    Expanded(child: text),
-                    const SizedBox(width: 16),
-                    mascot,
-                  ],
-                ),
-              ),
+            return Row(
+              children: [
+                Expanded(child: text),
+                const SizedBox(width: 16),
+                mascot,
+              ],
             );
           },
         ),
@@ -891,44 +852,15 @@ class _PracticeOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return HoverLift(
-      onTap: () => onChanged(value),
-      lift: 3,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-        margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? colorScheme.primary.withValues(alpha: 0.32)
-                : Colors.blueGrey.withValues(alpha: 0.10),
-          ),
-          gradient: LinearGradient(
-            colors: isSelected
-                ? [
-                    colorScheme.primary.withValues(alpha: 0.12),
-                    colorScheme.secondary.withValues(alpha: 0.08),
-                    Colors.white,
-                  ]
-                : [Colors.white, Colors.white],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: ListTile(
-            title: Text('$value) $label'),
-            trailing: isSelected
-                ? Icon(Icons.check_circle, color: colorScheme.primary)
-                : Icon(Icons.arrow_forward_ios_rounded, size: 16, color: colorScheme.primary),
-            onTap: () => onChanged(value),
-          ),
-        ),
+    return Card(
+      color: isSelected
+          ? Theme.of(context).colorScheme.primaryContainer
+          : Theme.of(context).cardTheme.color,
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        title: Text('$value) $label'),
+        trailing: isSelected ? const Icon(Icons.check_circle) : null,
+        onTap: () => onChanged(value),
       ),
     );
   }
@@ -941,25 +873,13 @@ class _QuestionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Theme.of(context).colorScheme.primary.withValues(alpha: 0.07),
-            const Color(0xFF6EE7F5).withValues(alpha: 0.08),
-            Colors.white,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-      ),
+    return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Text(
           statement,
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
               ),
         ),
       ),

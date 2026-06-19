@@ -217,12 +217,10 @@ class _WelcomeHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InteractiveParallax(
-      maxOffset: 8,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: LayoutBuilder(
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: LayoutBuilder(
             builder: (context, constraints) {
               final stacked = constraints.maxWidth < 600;
               final info = Column(
@@ -298,33 +296,15 @@ class _WelcomeHeroCard extends StatelessWidget {
                 );
               }
 
-              return DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
-                      const Color(0xFF6EE7F5).withValues(alpha: 0.08),
-                      Colors.white,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: Row(
-                    children: [
-                      Expanded(child: info),
-                      const SizedBox(width: 16),
-                      mascot,
-                    ],
-                  ),
-                ),
+              return Row(
+                children: [
+                  Expanded(child: info),
+                  const SizedBox(width: 16),
+                  mascot,
+                ],
               );
             },
           ),
-        ),
       ),
     );
   }
@@ -390,72 +370,34 @@ class _FeatureCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return HoverLift(
-      onTap: () {
-        onTap();
-      },
-      lift: 4,
-      child: Card(
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              colors: [
-                colorScheme.primary.withValues(alpha: 0.06),
-                colorScheme.secondary.withValues(alpha: 0.04),
-                Colors.white,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 30, color: colorScheme.primary),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
-                  child: Icon(icon, size: 28, color: colorScheme.primary),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  subtitle,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF556476),
-                        height: 1.35,
-                      ),
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () async => onTap(),
-                        child: Text(actionLabel),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Icon(
-                      Icons.arrow_forward_rounded,
-                      color: colorScheme.primary,
-                    ),
-                  ],
-                ),
-              ],
             ),
-          ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF556476),
+                    height: 1.35,
+                  ),
+            ),
+            const SizedBox(height: 18),
+            ElevatedButton(
+              onPressed: () async => onTap(),
+              child: Text(actionLabel),
+            ),
+          ],
         ),
       ),
     );

@@ -205,15 +205,13 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                   ),
                   const SizedBox(height: 12),
                   for (final result in _results!) ...[
-                    HoverLift(
-                      child: Card(
-                        child: ListTile(
-                          title: Text(result.topicName),
-                          subtitle: Text(
-                            'Aciertos: ${result.score}/${result.totalQuestions}',
-                          ),
-                          trailing: Text('Nivel ${result.assignedLevel}'),
+                    Card(
+                      child: ListTile(
+                        title: Text(result.topicName),
+                        subtitle: Text(
+                          'Aciertos: ${result.score}/${result.totalQuestions}',
                         ),
+                        trailing: Text('Nivel ${result.assignedLevel}'),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -438,47 +436,15 @@ class _AnswerOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return HoverLift(
-      onTap: () => onChanged(value),
-      lift: 3,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-        margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? colorScheme.primary.withValues(alpha: 0.32)
-                : Colors.blueGrey.withValues(alpha: 0.10),
-          ),
-          gradient: LinearGradient(
-            colors: isSelected
-                ? [
-                    colorScheme.primary.withValues(alpha: 0.12),
-                    colorScheme.secondary.withValues(alpha: 0.08),
-                    Colors.white,
-                  ]
-                : [
-                    Colors.white,
-                    Colors.white,
-                  ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: ListTile(
-            title: Text('$value) $label'),
-            trailing: isSelected
-                ? Icon(Icons.check_circle, color: colorScheme.primary)
-                : Icon(Icons.arrow_forward_ios_rounded, size: 16, color: colorScheme.primary),
-            onTap: () => onChanged(value),
-          ),
-        ),
+    return Card(
+      color: isSelected
+          ? Theme.of(context).colorScheme.primaryContainer
+          : Theme.of(context).cardTheme.color,
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        title: Text('$value) $label'),
+        trailing: isSelected ? const Icon(Icons.check_circle) : null,
+        onTap: () => onChanged(value),
       ),
     );
   }
@@ -495,19 +461,7 @@ class _QuestionPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
-            const Color(0xFF6EE7F5).withValues(alpha: 0.08),
-            Colors.white,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-      ),
+    return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -523,7 +477,7 @@ class _QuestionPanel extends StatelessWidget {
             Text(
               statement,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
             ),
           ],
