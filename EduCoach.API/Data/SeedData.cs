@@ -7,20 +7,43 @@ public static class SeedData
 {
     public static async Task InitializeAsync(AppDbContext dbContext)
     {
-        if (!await dbContext.Topics.AnyAsync())
+        var existingTopicIds = await dbContext.Topics
+            .AsNoTracking()
+            .Select(topic => topic.Id)
+            .ToListAsync();
+        var missingTopics = BuildTopics()
+            .Where(topic => !existingTopicIds.Contains(topic.Id))
+            .ToList();
+        if (missingTopics.Count > 0)
         {
-            dbContext.Topics.AddRange(
-                new Topic { Id = 1, Name = "Fracciones", Description = "Operaciones basicas con fracciones", IconName = "pie_chart" },
-                new Topic { Id = 2, Name = "Algebra Basica", Description = "Expresiones y ecuaciones de primer grado", IconName = "functions" });
+            dbContext.Topics.AddRange(missingTopics);
         }
 
-        if (!await dbContext.Questions.AnyAsync())
+        var existingQuestionIds = await dbContext.Questions
+            .AsNoTracking()
+            .Select(question => question.Id)
+            .ToListAsync();
+        var missingQuestions = BuildDiagnosticQuestions()
+            .Concat(BuildPracticeQuestions())
+            .Where(question => !existingQuestionIds.Contains(question.Id))
+            .ToList();
+        if (missingQuestions.Count > 0)
         {
-            dbContext.Questions.AddRange(BuildDiagnosticQuestions());
-            dbContext.Questions.AddRange(BuildPracticeQuestions());
+            dbContext.Questions.AddRange(missingQuestions);
         }
 
         await dbContext.SaveChangesAsync();
+    }
+
+    private static IEnumerable<Topic> BuildTopics()
+    {
+        return
+        [
+            new Topic { Id = 1, Name = "Fracciones", Description = "Operaciones basicas con fracciones", IconName = "pie_chart" },
+            new Topic { Id = 2, Name = "Algebra Basica", Description = "Expresiones y ecuaciones de primer grado", IconName = "functions" },
+            new Topic { Id = 3, Name = "Decimales", Description = "Operaciones y comparacion con numeros decimales", IconName = "calculate" },
+            new Topic { Id = 4, Name = "Geometria Basica", Description = "Perimetro, area y figuras geometricas simples", IconName = "category" }
+        ];
     }
 
     private static IEnumerable<Question> BuildDiagnosticQuestions()
@@ -36,13 +59,26 @@ public static class SeedData
             new Question { Id = Guid.Parse("22222222-2222-2222-2222-222222222002"), TopicId = 2, DifficultyLevel = 1, Statement = "Cuanto es 2x si x = 5?", OptionA = "7", OptionB = "10", OptionC = "25", OptionD = "3", CorrectOption = "B", Hint = "Reemplaza x por su valor.", IsDiagnostic = true },
             new Question { Id = Guid.Parse("22222222-2222-2222-2222-222222222003"), TopicId = 2, DifficultyLevel = 1, Statement = "Simplifica 3x + 2x.", OptionA = "5x", OptionB = "6x", OptionC = "x", OptionD = "5", CorrectOption = "A", Hint = "Suma terminos semejantes.", IsDiagnostic = true },
             new Question { Id = Guid.Parse("22222222-2222-2222-2222-222222222004"), TopicId = 2, DifficultyLevel = 2, Statement = "Si 2x = 12, cuanto vale x?", OptionA = "5", OptionB = "6", OptionC = "12", OptionD = "24", CorrectOption = "B", Hint = "Divide ambos lados entre 2.", IsDiagnostic = true },
-            new Question { Id = Guid.Parse("22222222-2222-2222-2222-222222222005"), TopicId = 2, DifficultyLevel = 2, Statement = "Cuanto es 4(x + 1) si x = 2?", OptionA = "8", OptionB = "10", OptionC = "12", OptionD = "6", CorrectOption = "C", Hint = "Primero resuelve el parentesis.", IsDiagnostic = true }
+            new Question { Id = Guid.Parse("22222222-2222-2222-2222-222222222005"), TopicId = 2, DifficultyLevel = 2, Statement = "Cuanto es 4(x + 1) si x = 2?", OptionA = "8", OptionB = "10", OptionC = "12", OptionD = "6", CorrectOption = "C", Hint = "Primero resuelve el parentesis.", IsDiagnostic = true },
+            new Question { Id = Guid.Parse("33333333-3333-3333-3333-333333333001"), TopicId = 3, DifficultyLevel = 1, Statement = "Cuanto es 0.5 + 0.2?", OptionA = "0.7", OptionB = "0.3", OptionC = "0.52", OptionD = "7.0", CorrectOption = "A", Hint = "Alinea la coma decimal y suma normalmente.", IsDiagnostic = true },
+            new Question { Id = Guid.Parse("33333333-3333-3333-3333-333333333002"), TopicId = 3, DifficultyLevel = 1, Statement = "Cual numero es mayor?", OptionA = "1.25", OptionB = "1.3", OptionC = "1.03", OptionD = "1.205", CorrectOption = "B", Hint = "Compara cifra por cifra despues de la coma.", IsDiagnostic = true },
+            new Question { Id = Guid.Parse("33333333-3333-3333-3333-333333333003"), TopicId = 3, DifficultyLevel = 1, Statement = "Cuanto es 2.4 - 1.1?", OptionA = "1.2", OptionB = "1.5", OptionC = "1.3", OptionD = "0.13", CorrectOption = "C", Hint = "Resta las decimas y las unidades por separado.", IsDiagnostic = true },
+            new Question { Id = Guid.Parse("33333333-3333-3333-3333-333333333004"), TopicId = 3, DifficultyLevel = 2, Statement = "Cuanto es 0.6 x 10?", OptionA = "0.06", OptionB = "6", OptionC = "60", OptionD = "0.6", CorrectOption = "B", Hint = "Multiplicar por 10 mueve la coma un lugar a la derecha.", IsDiagnostic = true },
+            new Question { Id = Guid.Parse("33333333-3333-3333-3333-333333333005"), TopicId = 3, DifficultyLevel = 2, Statement = "Cuanto es 3.5 dividido entre 0.5?", OptionA = "1.75", OptionB = "7", OptionC = "3", OptionD = "0.7", CorrectOption = "B", Hint = "Dividir entre 0.5 equivale a preguntar cuantas mitades caben.", IsDiagnostic = true },
+            new Question { Id = Guid.Parse("44444444-4444-4444-4444-444444444001"), TopicId = 4, DifficultyLevel = 1, Statement = "Cuantos lados tiene un triangulo?", OptionA = "2", OptionB = "3", OptionC = "4", OptionD = "5", CorrectOption = "B", Hint = "Piensa en la figura mas basica de tres lados.", IsDiagnostic = true },
+            new Question { Id = Guid.Parse("44444444-4444-4444-4444-444444444002"), TopicId = 4, DifficultyLevel = 1, Statement = "Cual es el perimetro de un cuadrado de lado 4?", OptionA = "8", OptionB = "12", OptionC = "16", OptionD = "20", CorrectOption = "C", Hint = "El perimetro del cuadrado es 4 veces el lado.", IsDiagnostic = true },
+            new Question { Id = Guid.Parse("44444444-4444-4444-4444-444444444003"), TopicId = 4, DifficultyLevel = 1, Statement = "Cual es el area de un rectangulo de 5 por 3?", OptionA = "8", OptionB = "15", OptionC = "16", OptionD = "30", CorrectOption = "B", Hint = "El area del rectangulo es base por altura.", IsDiagnostic = true },
+            new Question { Id = Guid.Parse("44444444-4444-4444-4444-444444444004"), TopicId = 4, DifficultyLevel = 2, Statement = "Cuantos grados tiene un angulo recto?", OptionA = "45", OptionB = "90", OptionC = "120", OptionD = "180", CorrectOption = "B", Hint = "Es la mitad de un angulo llano.", IsDiagnostic = true },
+            new Question { Id = Guid.Parse("44444444-4444-4444-4444-444444444005"), TopicId = 4, DifficultyLevel = 2, Statement = "Cuanto suman los angulos internos de un triangulo?", OptionA = "90", OptionB = "180", OptionC = "270", OptionD = "360", CorrectOption = "B", Hint = "Es una propiedad basica de todos los triangulos.", IsDiagnostic = true }
         ];
     }
 
     private static IEnumerable<Question> BuildPracticeQuestions()
     {
-        return BuildFractionPracticeQuestions().Concat(BuildAlgebraPracticeQuestions());
+        return BuildFractionPracticeQuestions()
+            .Concat(BuildAlgebraPracticeQuestions())
+            .Concat(BuildDecimalPracticeQuestions())
+            .Concat(BuildGeometryPracticeQuestions());
     }
 
     private static IEnumerable<Question> BuildFractionPracticeQuestions()
@@ -79,6 +115,11 @@ public static class SeedData
             CreatePracticeQuestion(1, 3, 28, "Cuanto es 11/12 - 5/18?", "1/2", "23/36", "16/30", "6/36", "B", "Convierte ambas a treinta y seisavos."),
             CreatePracticeQuestion(1, 3, 29, "Cuanto es 3/7 x 14/9?", "2/3", "42/63", "17/16", "6/7", "A", "Simplifica 14 con 7 y 3 con 9."),
             CreatePracticeQuestion(1, 3, 30, "Cuanto es 8/15 dividido entre 4/25?", "10/3", "32/375", "2/5", "5/6", "A", "Invierte 4/25 y multiplica."),
+            CreatePracticeQuestion(1, 1, 31, "Cuanto es 6/8 simplificado?", "2/3", "3/4", "4/6", "1/8", "B", "Divide numerador y denominador entre 2."),
+            CreatePracticeQuestion(1, 2, 32, "Cuanto es 5/6 + 1/3?", "6/9", "1", "7/6", "5/18", "C", "Convierte 1/3 a sextos antes de sumar."),
+            CreatePracticeQuestion(1, 2, 33, "Cuanto es 7/12 - 1/3?", "1/4", "1/3", "6/12", "2/9", "A", "Convierte 1/3 a doceavos y luego resta."),
+            CreatePracticeQuestion(1, 3, 34, "Cuanto es 9/14 + 2/7?", "11/21", "13/14", "1", "5/7", "B", "Convierte 2/7 a catorceavos antes de sumar."),
+            CreatePracticeQuestion(1, 3, 35, "Cuanto es 3/4 dividido entre 9/8?", "2/3", "3/2", "27/32", "8/9", "A", "Divide multiplicando por el inverso de 9/8."),
         ];
     }
 
@@ -116,6 +157,55 @@ public static class SeedData
             CreatePracticeQuestion(2, 3, 28, "Resuelve 2(x + 1) = 14.", "5", "6", "7", "8", "B", "Divide entre 2 y luego resta 1."),
             CreatePracticeQuestion(2, 3, 29, "Cuanto es 3(2a - 1)?", "6a - 3", "6a - 1", "5a - 3", "6a + 3", "A", "Distribuye el 3."),
             CreatePracticeQuestion(2, 3, 30, "Resuelve 7 + 2x = 19.", "5", "6", "7", "12", "B", "Resta 7 y divide entre 2."),
+            CreatePracticeQuestion(2, 1, 31, "Si x + 8 = 13, cuanto vale x?", "4", "5", "6", "21", "B", "Resta 8 a ambos lados."),
+            CreatePracticeQuestion(2, 2, 32, "Simplifica 6y - y + 2.", "5y + 2", "7y + 2", "5y", "6y + 1", "A", "Combina primero los terminos semejantes."),
+            CreatePracticeQuestion(2, 2, 33, "Si 3x + 2 = 11, cuanto vale x?", "3", "9", "11", "13", "A", "Resta 2 y luego divide entre 3."),
+            CreatePracticeQuestion(2, 3, 34, "Resuelve 4(x - 2) = 20.", "5", "6", "7", "8", "C", "Divide entre 4 y luego suma 2."),
+            CreatePracticeQuestion(2, 3, 35, "Simplifica 2(2m + 3) - m.", "3m + 6", "4m + 3", "m + 6", "4m - 3", "A", "Distribuye el 2 y luego combina terminos."),
+        ];
+    }
+
+    private static IEnumerable<Question> BuildDecimalPracticeQuestions()
+    {
+        return
+        [
+            CreatePracticeQuestion(3, 1, 1, "Cuanto es 0.2 + 0.3?", "0.5", "0.23", "0.6", "0.03", "A", "Suma las decimas alineando la coma."),
+            CreatePracticeQuestion(3, 1, 2, "Cuanto es 1.5 - 0.4?", "1.9", "1.1", "1.4", "0.11", "B", "Resta decima con decima."),
+            CreatePracticeQuestion(3, 1, 3, "Cual numero es mayor?", "0.08", "0.8", "0.18", "0.28", "B", "Un numero con ocho decimas es mayor que ocho centesimas."),
+            CreatePracticeQuestion(3, 1, 4, "Cuanto es 0.7 x 10?", "7", "0.07", "70", "0.7", "A", "Multiplicar por 10 mueve la coma un lugar a la derecha."),
+            CreatePracticeQuestion(3, 1, 5, "Cuanto es 3.2 dividido entre 10?", "32", "3.02", "0.32", "0.032", "C", "Dividir entre 10 mueve la coma un lugar a la izquierda."),
+            CreatePracticeQuestion(3, 2, 6, "Cuanto es 2.35 + 1.4?", "3.65", "3.75", "2.49", "3.15", "B", "Escribe 1.4 como 1.40 para alinear la suma."),
+            CreatePracticeQuestion(3, 2, 7, "Cuanto es 5.6 - 2.75?", "2.85", "3.15", "2.95", "3.85", "A", "Convierte 5.6 en 5.60 para restar con facilidad."),
+            CreatePracticeQuestion(3, 2, 8, "Cuanto es 0.25 x 4?", "0.5", "1", "1.25", "0.75", "B", "Cuatro veces un cuarto es una unidad."),
+            CreatePracticeQuestion(3, 2, 9, "Cuanto es 1.2 + 0.08?", "1.28", "1.10", "1.8", "1.208", "A", "Suma decimas y centesimas por separado."),
+            CreatePracticeQuestion(3, 2, 10, "Que fraccion equivale a 0.5?", "1/5", "5/100", "5/10", "1/20", "C", "Cinco decimas representan la mitad."),
+            CreatePracticeQuestion(3, 3, 11, "Cuanto es 3.75 dividido entre 1.5?", "2", "2.5", "25", "1.25", "B", "Piensa cuantas veces cabe 1.5 dentro de 3.75."),
+            CreatePracticeQuestion(3, 3, 12, "Cuanto es 0.04 x 100?", "0.4", "4", "40", "0.004", "B", "Multiplicar por 100 mueve la coma dos lugares."),
+            CreatePracticeQuestion(3, 3, 13, "Cuanto es 2.5 - 0.875?", "1.625", "1.725", "2.375", "1.575", "A", "Escribe 2.5 como 2.500 antes de restar."),
+            CreatePracticeQuestion(3, 3, 14, "Cuanto es 1.25 + 2.375?", "3.5", "3.625", "3.575", "2.500", "B", "Alinea unidades, decimas, centesimas y milesimas."),
+            CreatePracticeQuestion(3, 3, 15, "Cuanto es 4.8 dividido entre 0.6?", "0.8", "8", "48", "6", "B", "Puedes pensar en 48 dividido entre 6."),
+        ];
+    }
+
+    private static IEnumerable<Question> BuildGeometryPracticeQuestions()
+    {
+        return
+        [
+            CreatePracticeQuestion(4, 1, 1, "Cuantos lados tiene un cuadrilatero?", "3", "4", "5", "6", "B", "La palabra quadri indica cuatro."),
+            CreatePracticeQuestion(4, 1, 2, "Cual es el area de un cuadrado de lado 3?", "6", "9", "12", "27", "B", "El area del cuadrado es lado por lado."),
+            CreatePracticeQuestion(4, 1, 3, "Cual es el perimetro de un triangulo equilatero de lado 5?", "10", "15", "20", "25", "B", "Suma sus tres lados iguales."),
+            CreatePracticeQuestion(4, 1, 4, "Cuantos grados mide un angulo recto?", "45", "60", "90", "180", "C", "Es la mitad de un angulo llano."),
+            CreatePracticeQuestion(4, 1, 5, "Que figura tiene 4 lados iguales y 4 angulos rectos?", "Rombo", "Rectangulo", "Triangulo", "Cuadrado", "D", "Busca la figura que cumple ambas condiciones."),
+            CreatePracticeQuestion(4, 2, 6, "Cual es el perimetro de un rectangulo de lados 6 y 2?", "8", "12", "16", "24", "C", "Suma dos veces el largo y dos veces el ancho."),
+            CreatePracticeQuestion(4, 2, 7, "Cual es el area de un rectangulo de base 7 y altura 4?", "11", "21", "28", "35", "C", "Multiplica base por altura."),
+            CreatePracticeQuestion(4, 2, 8, "Cuanto suman los angulos internos de un triangulo?", "90", "180", "270", "360", "B", "Es una propiedad fija de esa figura."),
+            CreatePracticeQuestion(4, 2, 9, "Si el perimetro de un cuadrado es 20, cuanto mide cada lado?", "4", "5", "6", "10", "B", "Divide el perimetro total entre 4."),
+            CreatePracticeQuestion(4, 2, 10, "Cuantos vertices tiene un triangulo?", "2", "3", "4", "6", "B", "Cada punta de la figura es un vertice."),
+            CreatePracticeQuestion(4, 3, 11, "Cual es el area de un triangulo de base 10 y altura 4?", "20", "40", "14", "24", "A", "Usa base por altura y luego divide entre 2."),
+            CreatePracticeQuestion(4, 3, 12, "Si el area de un cuadrado es 16, cual es su perimetro?", "8", "12", "16", "20", "C", "Primero encuentra el lado y luego calcula el perimetro."),
+            CreatePracticeQuestion(4, 3, 13, "Si dos angulos de un triangulo miden 50 y 60 grados, cuanto mide el tercero?", "60", "70", "80", "110", "B", "Resta a 180 la suma de los otros dos angulos."),
+            CreatePracticeQuestion(4, 3, 14, "Cual es el perimetro de un rectangulo de base 8 y altura 3?", "11", "22", "24", "48", "B", "Suma base + altura + base + altura."),
+            CreatePracticeQuestion(4, 3, 15, "Si el area de un rectangulo es 24 y su base es 4, cuanto mide la altura?", "5", "6", "8", "12", "B", "Divide el area entre la base."),
         ];
     }
 

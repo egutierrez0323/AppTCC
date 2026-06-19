@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_math_fork/flutter_math.dart';
 
 import '../../../core/api/educoach_api.dart';
 import '../../auth/session_storage.dart';
@@ -27,6 +28,8 @@ class _PracticeScreenState extends State<PracticeScreen> {
   static const _topics = <Map<String, dynamic>>[
     {'id': 1, 'name': 'Fracciones'},
     {'id': 2, 'name': 'Algebra Basica'},
+    {'id': 3, 'name': 'Decimales'},
+    {'id': 4, 'name': 'Geometria Basica'},
   ];
 
   late int _topicId;
@@ -113,10 +116,13 @@ class _PracticeScreenState extends State<PracticeScreen> {
         builder: (context) {
           return AlertDialog(
             title: Text(result.correct ? 'Respuesta correcta' : 'Respuesta incorrecta'),
-            content: Text(
-              result.correct
-                  ? 'Buen trabajo. Sigue avanzando.'
-                  : 'La opcion correcta es ${result.correctOption}.\n\n${result.explanation ?? ''}',
+            content: SingleChildScrollView(
+              child: result.correct
+                  ? const Text('Buen trabajo. Sigue avanzando.')
+                  : _ExplanationContent(
+                      correctOption: result.correctOption,
+                      explanation: result.explanation,
+                    ),
             ),
             actions: [
               TextButton(
@@ -311,6 +317,82 @@ class _PracticeScreenState extends State<PracticeScreen> {
                       ),
                     ],
                   ),
+      ),
+    );
+  }
+}
+
+class _ExplanationContent extends StatelessWidget {
+  const _ExplanationContent({
+    required this.correctOption,
+    required this.explanation,
+  });
+
+  final String correctOption;
+  final AiMathExplanation? explanation;
+
+  @override
+  Widget build(BuildContext context) {
+    final explanation = this.explanation;
+    if (explanation == null) {
+      return Text('La opcion correcta es $correctOption.');
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('La opcion correcta es $correctOption.'),
+        if (explanation.summary.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(explanation.summary),
+        ],
+        for (var index = 0; index < explanation.steps.length; index++) ...[
+          const SizedBox(height: 12),
+          Text(
+            '${index + 1}. ${explanation.steps[index].title}',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(explanation.steps[index].text),
+          if (explanation.steps[index].formulaLatex.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _FormulaView(formulaLatex: explanation.steps[index].formulaLatex),
+          ],
+        ],
+        if (explanation.finalAnswerText.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(
+            explanation.finalAnswerText,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+        if (explanation.encouragement.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(explanation.encouragement),
+        ],
+      ],
+    );
+  }
+}
+
+class _FormulaView extends StatelessWidget {
+  const _FormulaView({required this.formulaLatex});
+
+  final String formulaLatex;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Math.tex(
+        formulaLatex,
+        mathStyle: MathStyle.display,
+        onErrorFallback: (error) => Text(formulaLatex),
       ),
     );
   }
