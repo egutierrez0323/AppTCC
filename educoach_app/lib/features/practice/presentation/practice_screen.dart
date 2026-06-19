@@ -25,12 +25,6 @@ class PracticeScreen extends StatefulWidget {
 }
 
 class _PracticeScreenState extends State<PracticeScreen> {
-  static const _topics = <Map<String, dynamic>>[
-    {'id': 1, 'name': 'Fracciones'},
-    {'id': 2, 'name': 'Algebra Basica'},
-    {'id': 3, 'name': 'Decimales'},
-    {'id': 4, 'name': 'Geometria Basica'},
-  ];
   static const _modes = <String>[
     PracticeMode.normal,
     PracticeMode.review,
@@ -39,6 +33,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
 
   late int _topicId;
   late int _level;
+  late Future<List<PracticeTopic>> _topicsFuture;
   String _mode = PracticeMode.normal;
   bool _isLoading = false;
   PracticeSessionData? _sessionData;
@@ -51,6 +46,16 @@ class _PracticeScreenState extends State<PracticeScreen> {
     super.initState();
     _topicId = widget.initialTopicId ?? 1;
     _level = widget.initialLevel ?? 1;
+    _topicsFuture = _loadTopics();
+  }
+
+  Future<List<PracticeTopic>> _loadTopics() async {
+    return widget.api.getTopics(widget.session.token);
+  }
+
+  Future<void> _refreshTopics() async {
+    setState(() => _topicsFuture = _loadTopics());
+    await _topicsFuture;
   }
 
   Future<void> _startPractice() async {
@@ -190,78 +195,127 @@ class _PracticeScreenState extends State<PracticeScreen> {
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: session == null
-            ? ListView(
-                children: [
-                  DropdownButtonFormField<String>(
-                    initialValue: _mode,
-                    decoration: const InputDecoration(labelText: 'Modo'),
-                    items: _modes
-                        .map(
-                          (mode) => DropdownMenuItem<String>(
-                            value: mode,
-                            child: Text(_modeLabel(mode)),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => _mode = value);
+            ? FutureBuilder<List<PracticeTopic>>(
+                future: _topicsFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (snapshot.hasError) {
+                    final error = snapshot.error;
+                    if (error is ApiException && error.statusCode == 401) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) => widget.onUnauthorized());
+                      return const Center(child: Text('Sesion expirada. Inicia sesion nuevamente.'));
+                    }
+
+                    return _PracticeErrorView(
+                      message: error.toString(),
+                      onRetry: _refreshTopics,
+                    );
+                  }
+
+                  final topics = snapshot.data ?? const <PracticeTopic>[];
+                  if (topics.isEmpty) {
+                    return _PracticeErrorView(
+                      message: 'No hay temas disponibles en este momento.',
+                      onRetry: _refreshTopics,
+                    );
+                  }
+
+                  final effectiveTopicId = topics.any((topic) => topic.id == _topicId)
+                      ? _topicId
+                      : topics.first.id;
+                  if (effectiveTopicId != _topicId) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        setState(() => _topicId = effectiveTopicId);
                       }
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _modeDescription(_mode),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<int>(
-                    initialValue: _topicId,
-                    decoration: const InputDecoration(labelText: 'Tema'),
-                    items: _topics
-                        .map(
-                          (topic) => DropdownMenuItem<int>(
-                            value: topic['id'] as int,
-                            child: Text(topic['name'] as String),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: _mode == PracticeMode.mixed
-                        ? null
-                        : (value) {
-                            if (value != null) {
-                              setState(() => _topicId = value);
-                            }
-                          },
-                  ),
-                  if (_mode == PracticeMode.mixed) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'En practica mixta el tema se ignora y se combinan preguntas de varios temas en el nivel elegido.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<int>(
-                    initialValue: _level,
-                    decoration: const InputDecoration(labelText: 'Nivel'),
-                    items: const [
-                      DropdownMenuItem(value: 1, child: Text('Basico')),
-                      DropdownMenuItem(value: 2, child: Text('Intermedio')),
-                      DropdownMenuItem(value: 3, child: Text('Avanzado')),
+                    });
+                  }
+
+                  return ListView(
+                    children: [
+                      DropdownButtonFormField<String>(
+                        initialValue: _mode,
+                        decoration: const InputDecoration(labelText: 'Modo'),
+                        items: _modes
+                            .map(
+                              (mode) => DropdownMenuItem<String>(
+                                value: mode,
+                                child: Text(_modeLabel(mode)),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _mode = value);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _modeDescription(_mode),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<int>(
+                        initialValue: effectiveTopicId,
+                        decoration: const InputDecoration(labelText: 'Tema'),
+                        items: topics
+                            .map(
+                              (topic) => DropdownMenuItem<int>(
+                                value: topic.id,
+                                child: Text(topic.name),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: _mode == PracticeMode.mixed
+                            ? null
+                            : (value) {
+                                if (value != null) {
+                                  setState(() => _topicId = value);
+                                }
+                              },
+                      ),
+                      if (_mode == PracticeMode.mixed) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'En practica mixta el tema se ignora y se combinan preguntas de varios temas en el nivel elegido.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ] else ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          topics
+                              .firstWhere((topic) => topic.id == effectiveTopicId)
+                              .description,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<int>(
+                        initialValue: _level,
+                        decoration: const InputDecoration(labelText: 'Nivel'),
+                        items: const [
+                          DropdownMenuItem(value: 1, child: Text('Basico')),
+                          DropdownMenuItem(value: 2, child: Text('Intermedio')),
+                          DropdownMenuItem(value: 3, child: Text('Avanzado')),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _level = value);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : _startPractice,
+                        child: Text(_isLoading ? 'Cargando...' : 'Iniciar practica'),
+                      ),
                     ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => _level = value);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _startPractice,
-                    child: Text(_isLoading ? 'Cargando...' : 'Iniciar practica'),
-                  ),
-                ],
+                  );
+                },
               )
             : _summary != null
                 ? ListView(
@@ -386,6 +440,36 @@ class _PracticeScreenState extends State<PracticeScreen> {
         'Prioriza preguntas que ya fallaste antes en el tema y nivel elegidos. Si aun no hay errores previos, inicia una practica normal.',
       _ => 'Inicia una sesion normal con preguntas del tema y nivel seleccionados.',
     };
+  }
+}
+
+class _PracticeErrorView extends StatelessWidget {
+  const _PracticeErrorView({
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String message;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () async => onRetry(),
+              child: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

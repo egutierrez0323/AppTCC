@@ -8,6 +8,7 @@ import '../../features/auth/session_storage.dart';
 abstract class EduCoachApi {
   Future<AuthSession> login(String email, String password);
   Future<AuthSession> register(String name, String email, String password);
+  Future<List<PracticeTopic>> getTopics(String token);
   Future<List<DiagnosticQuestion>> getDiagnosticQuestions(String token);
   Future<List<DiagnosticTopicResult>> submitDiagnostic(
     String token,
@@ -67,6 +68,14 @@ class HttpEduCoachApi implements EduCoachApi {
     );
 
     return _parseSession(response);
+  }
+
+  @override
+  Future<List<PracticeTopic>> getTopics(String token) async {
+    final response = await _getList('/topics', token: token);
+    return response
+        .map((item) => PracticeTopic.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   @override
@@ -335,6 +344,29 @@ class DiagnosticAnswer {
       'questionId': questionId,
       'selectedOption': selectedOption,
     };
+  }
+}
+
+class PracticeTopic {
+  const PracticeTopic({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.iconName,
+  });
+
+  final int id;
+  final String name;
+  final String description;
+  final String iconName;
+
+  factory PracticeTopic.fromJson(Map<String, dynamic> json) {
+    return PracticeTopic(
+      id: json['id'] as int,
+      name: json['name'] as String,
+      description: json['description'] as String? ?? '',
+      iconName: json['iconName'] as String? ?? '',
+    );
   }
 }
 
