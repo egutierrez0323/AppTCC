@@ -63,7 +63,7 @@ public sealed class PracticeService(AppDbContext dbContext, DeepSeekService deep
         var session = new PracticeSession
         {
             UserId = userId,
-            TopicId = topicId,
+            TopicId = topic.Id,
             DifficultyLevel = sanitizedLevel,
             PlannedQuestionCount = questions.Count,
             StartedAt = DateTime.UtcNow

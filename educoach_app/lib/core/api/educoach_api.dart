@@ -163,6 +163,8 @@ class HttpEduCoachApi implements EduCoachApi {
           )
           .timeout(_requestTimeout);
       return _decodeObject(response);
+    } on ApiException {
+      rethrow;
     } on TimeoutException {
       throw const ApiException(_timeoutMessage);
     } catch (_) {
@@ -180,6 +182,8 @@ class HttpEduCoachApi implements EduCoachApi {
           )
           .timeout(_requestTimeout);
       return _decodeList(response);
+    } on ApiException {
+      rethrow;
     } on TimeoutException {
       throw const ApiException(_timeoutMessage);
     } catch (_) {
@@ -202,6 +206,8 @@ class HttpEduCoachApi implements EduCoachApi {
           )
           .timeout(_requestTimeout);
       return _decodeObject(response);
+    } on ApiException {
+      rethrow;
     } on TimeoutException {
       throw const ApiException(_timeoutMessage);
     } catch (_) {
