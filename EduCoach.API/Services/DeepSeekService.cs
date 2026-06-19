@@ -12,7 +12,12 @@ public sealed class DeepSeekService(HttpClient httpClient, IConfiguration config
         var baseUrl = configuration["DeepSeek:BaseUrl"];
         var model = configuration["DeepSeek:Model"] ?? "deepseek-chat";
 
-        if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(baseUrl))
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            baseUrl = "https://api.deepseek.com";
+        }
+
+        if (string.IsNullOrWhiteSpace(apiKey))
         {
             return BuildFallbackExplanation(question, selectedOption);
         }
