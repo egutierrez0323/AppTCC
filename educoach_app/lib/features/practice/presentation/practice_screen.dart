@@ -31,9 +31,14 @@ class _PracticeScreenState extends State<PracticeScreen> {
     {'id': 3, 'name': 'Decimales'},
     {'id': 4, 'name': 'Geometria Basica'},
   ];
+  static const _modes = <String>[
+    PracticeMode.normal,
+    PracticeMode.review,
+  ];
 
   late int _topicId;
   late int _level;
+  String _mode = PracticeMode.normal;
   bool _isLoading = false;
   PracticeSessionData? _sessionData;
   PracticeAnswerResult? _summary;
@@ -58,6 +63,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
         widget.session.token,
         _topicId,
         _level,
+        mode: _mode,
       );
 
       if (!mounted) {
@@ -69,6 +75,13 @@ class _PracticeScreenState extends State<PracticeScreen> {
         _currentIndex = 0;
         _selectedOption = null;
       });
+
+      final message = session.modeMessage;
+      if (message != null && message.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
     } catch (error) {
       if (!mounted) {
         return;
@@ -178,6 +191,29 @@ class _PracticeScreenState extends State<PracticeScreen> {
         child: session == null
             ? ListView(
                 children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: _mode,
+                    decoration: const InputDecoration(labelText: 'Modo'),
+                    items: _modes
+                        .map(
+                          (mode) => DropdownMenuItem<String>(
+                            value: mode,
+                            child: Text(_modeLabel(mode)),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _mode = value);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _modeDescription(_mode),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 16),
                   DropdownButtonFormField<int>(
                     initialValue: _topicId,
                     decoration: const InputDecoration(labelText: 'Tema'),
@@ -233,6 +269,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              Text('Modo: ${_modeLabel(session.mode)}'),
                               Text('Tema: ${session.topicName}'),
                               Text('Nivel actual: ${_summary!.currentLevel}'),
                               Text(
@@ -265,6 +302,8 @@ class _PracticeScreenState extends State<PracticeScreen> {
                               fontWeight: FontWeight.w700,
                             ),
                       ),
+                      const SizedBox(height: 8),
+                      Text(_modeLabel(session.mode)),
                       const SizedBox(height: 8),
                       Text('Pregunta ${_currentIndex + 1} de ${session.questions.length}'),
                       const SizedBox(height: 12),
@@ -319,6 +358,21 @@ class _PracticeScreenState extends State<PracticeScreen> {
                   ),
       ),
     );
+  }
+
+  String _modeLabel(String mode) {
+    return switch (mode) {
+      PracticeMode.review => 'Repasar errores',
+      _ => 'Practica normal',
+    };
+  }
+
+  String _modeDescription(String mode) {
+    return switch (mode) {
+      PracticeMode.review =>
+        'Prioriza preguntas que ya fallaste antes en el tema y nivel elegidos. Si aun no hay errores previos, inicia una practica normal.',
+      _ => 'Inicia una sesion normal con preguntas del tema y nivel seleccionados.',
+    };
   }
 }
 

@@ -8,23 +8,37 @@ namespace EduCoach.API.Services;
 public sealed class PracticeService(AppDbContext dbContext, DeepSeekService deepSeekService)
 {
     private const int DefaultSessionQuestionCount = 5;
+    private const string NormalMode = "normal";
+    private const string ReviewMode = "review";
 
-    public async Task<PracticeSessionResponse> StartSessionAsync(Guid userId, int topicId, int level)
+    public async Task<PracticeSessionResponse> StartSessionAsync(
+        Guid userId,
+        int topicId,
+        int level,
+        string? mode,
+        CancellationToken cancellationToken = default)
     {
         var topic = await dbContext.Topics.AsNoTracking().FirstOrDefaultAsync(item => item.Id == topicId)
             ?? throw new InvalidOperationException("El tema seleccionado no existe.");
 
         var sanitizedLevel = Math.Clamp(level, 1, 3);
-        var questions = await dbContext.Questions
-            .AsNoTracking()
-            .Where(question => !question.IsDiagnostic && question.TopicId == topicId && question.DifficultyLevel == sanitizedLevel)
-            .OrderBy(_ => Guid.NewGuid())
-            .Take(DefaultSessionQuestionCount)
-            .ToListAsync();
+        var sanitizedMode = NormalizeMode(mode);
+        var actualMode = sanitizedMode;
+        string? modeMessage = null;
+
+        var questions = sanitizedMode == ReviewMode
+            ? await GetReviewQuestionsAsync(userId, topicId, sanitizedLevel, cancellationToken)
+            : await GetNormalQuestionsAsync(topicId, sanitizedLevel, cancellationToken: cancellationToken);
 
         if (questions.Count == 0)
         {
             throw new InvalidOperationException("No hay preguntas de practica disponibles para ese tema y nivel.");
+        }
+
+        if (sanitizedMode == ReviewMode && !questions.Any(question => question.wasFailedBefore))
+        {
+            actualMode = NormalMode;
+            modeMessage = "Aun no tienes errores previos en este tema y nivel. Se inicio una practica normal.";
         }
 
         var session = new PracticeSession
@@ -45,17 +59,102 @@ public sealed class PracticeService(AppDbContext dbContext, DeepSeekService deep
             TopicId = topic.Id,
             TopicName = topic.Name,
             DifficultyLevel = session.DifficultyLevel,
+            Mode = actualMode,
+            ModeMessage = modeMessage,
             Questions = questions.Select(question => new PracticeQuestionResponse
             {
-                Id = question.Id,
-                Statement = question.Statement,
-                OptionA = question.OptionA,
-                OptionB = question.OptionB,
-                OptionC = question.OptionC,
-                OptionD = question.OptionD,
-                Hint = question.Hint
+                Id = question.question.Id,
+                Statement = question.question.Statement,
+                OptionA = question.question.OptionA,
+                OptionB = question.question.OptionB,
+                OptionC = question.question.OptionC,
+                OptionD = question.question.OptionD,
+                Hint = question.question.Hint
             }).ToList()
         };
+    }
+
+    private static string NormalizeMode(string? mode)
+    {
+        var normalized = mode?.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            ReviewMode => ReviewMode,
+            _ => NormalMode
+        };
+    }
+
+    private async Task<List<(Question question, bool wasFailedBefore)>> GetNormalQuestionsAsync(
+        int topicId,
+        int level,
+        IReadOnlyCollection<Guid>? excludedQuestionIds = null,
+        CancellationToken cancellationToken = default)
+    {
+        var excludedIds = excludedQuestionIds ?? Array.Empty<Guid>();
+        var questions = await dbContext.Questions
+            .AsNoTracking()
+            .Where(question =>
+                !question.IsDiagnostic &&
+                question.TopicId == topicId &&
+                question.DifficultyLevel == level &&
+                !excludedIds.Contains(question.Id))
+            .OrderBy(_ => Guid.NewGuid())
+            .Take(DefaultSessionQuestionCount)
+            .ToListAsync(cancellationToken);
+
+        return questions
+            .Select(question => (question, wasFailedBefore: false))
+            .ToList();
+    }
+
+    private async Task<List<(Question question, bool wasFailedBefore)>> GetReviewQuestionsAsync(
+        Guid userId,
+        int topicId,
+        int level,
+        CancellationToken cancellationToken = default)
+    {
+        var failedQuestionIds = await dbContext.UserResponses
+            .AsNoTracking()
+            .Include(response => response.Session)
+            .Where(response =>
+                !response.IsCorrect &&
+                response.Session != null &&
+                response.Session.UserId == userId &&
+                response.Session.TopicId == topicId &&
+                response.Session.DifficultyLevel == level)
+            .OrderByDescending(response => response.AnsweredAt)
+            .Select(response => response.QuestionId)
+            .Distinct()
+            .Take(DefaultSessionQuestionCount)
+            .ToListAsync(cancellationToken);
+
+        var reviewedQuestions = failedQuestionIds.Count == 0
+            ? []
+            : await dbContext.Questions
+                .AsNoTracking()
+                .Where(question => !question.IsDiagnostic && failedQuestionIds.Contains(question.Id))
+                .ToListAsync(cancellationToken);
+
+        var reviewedLookup = reviewedQuestions.ToDictionary(question => question.Id);
+        var orderedReviewQuestions = failedQuestionIds
+            .Where(reviewedLookup.ContainsKey)
+            .Select(id => (question: reviewedLookup[id], wasFailedBefore: true))
+            .ToList();
+
+        if (orderedReviewQuestions.Count >= DefaultSessionQuestionCount)
+        {
+            return orderedReviewQuestions;
+        }
+
+        var fillerQuestions = await GetNormalQuestionsAsync(
+            topicId,
+            level,
+            orderedReviewQuestions.Select(item => item.question.Id).ToArray(),
+            cancellationToken);
+
+        return orderedReviewQuestions
+            .Concat(fillerQuestions.Take(DefaultSessionQuestionCount - orderedReviewQuestions.Count))
+            .ToList();
     }
 
     public async Task<SubmitPracticeAnswerResponse> SubmitAnswerAsync(Guid userId, SubmitPracticeAnswerRequest request, CancellationToken cancellationToken = default)

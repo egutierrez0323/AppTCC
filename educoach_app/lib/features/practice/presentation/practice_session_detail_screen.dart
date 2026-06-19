@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_math_fork/flutter_math.dart';
 
 import '../../../core/api/educoach_api.dart';
 import '../../auth/session_storage.dart';
@@ -120,9 +121,9 @@ class _PracticeSessionDetailScreenState extends State<PracticeSessionDetailScree
                             const SizedBox(height: 8),
                             Text('Tu respuesta: ${answer.selectedOption}'),
                             Text('Correcta: ${answer.correctOption}'),
-                            if ((answer.aiExplanation ?? '').trim().isNotEmpty) ...[
+                            if (answer.aiExplanation != null) ...[
                               const SizedBox(height: 8),
-                              Text(answer.aiExplanation!.trim()),
+                              _StoredExplanationView(explanation: answer.aiExplanation!),
                             ],
                           ],
                         ),
@@ -135,6 +136,57 @@ class _PracticeSessionDetailScreenState extends State<PracticeSessionDetailScree
           );
         },
       ),
+    );
+  }
+}
+
+class _StoredExplanationView extends StatelessWidget {
+  const _StoredExplanationView({required this.explanation});
+
+  final AiMathExplanation explanation;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (explanation.summary.isNotEmpty) Text(explanation.summary),
+        for (final step in explanation.steps) ...[
+          const SizedBox(height: 8),
+          Text(
+            step.title,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(step.text),
+          if (step.formulaLatex.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Math.tex(
+                step.formulaLatex,
+                mathStyle: MathStyle.display,
+                onErrorFallback: (error) => Text(step.formulaLatex),
+              ),
+            ),
+          ],
+        ],
+        if (explanation.finalAnswerText.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            explanation.finalAnswerText,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+        if (explanation.encouragement.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(explanation.encouragement),
+        ],
+      ],
     );
   }
 }
@@ -168,4 +220,3 @@ class _ErrorView extends StatelessWidget {
     );
   }
 }
-

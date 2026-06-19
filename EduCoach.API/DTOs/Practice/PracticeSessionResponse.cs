@@ -6,6 +6,8 @@ public sealed class PracticeSessionResponse
     public required int TopicId { get; init; }
     public required string TopicName { get; init; }
     public required int DifficultyLevel { get; init; }
+    public required string Mode { get; init; }
+    public string? ModeMessage { get; init; }
     public required List<PracticeQuestionResponse> Questions { get; init; }
 }
 

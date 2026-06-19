@@ -13,7 +13,12 @@ abstract class EduCoachApi {
     String token,
     List<DiagnosticAnswer> answers,
   );
-  Future<PracticeSessionData> startPractice(String token, int topicId, int level);
+  Future<PracticeSessionData> startPractice(
+    String token,
+    int topicId,
+    int level, {
+    String mode = PracticeMode.normal,
+  });
   Future<PracticeAnswerResult> submitPracticeAnswer(
     String token,
     PracticeAnswerSubmission submission,
@@ -23,6 +28,10 @@ abstract class EduCoachApi {
   Future<PracticeSessionDetail> getPracticeSessionDetail(String token, String sessionId);
   Future<PracticeRecommendation> getPracticeRecommendation(String token);
 }
+
+const Duration _requestTimeout = Duration(seconds: 45);
+const String _timeoutMessage =
+    'El servidor tardó demasiado en responder. Si estaba inactivo, espera unos segundos y vuelve a intentar.';
 
 class HttpEduCoachApi implements EduCoachApi {
   HttpEduCoachApi({
@@ -88,9 +97,14 @@ class HttpEduCoachApi implements EduCoachApi {
   }
 
   @override
-  Future<PracticeSessionData> startPractice(String token, int topicId, int level) async {
+  Future<PracticeSessionData> startPractice(
+    String token,
+    int topicId,
+    int level, {
+    String mode = PracticeMode.normal,
+  }) async {
     final response = await _get(
-      '/practice/questions?topicId=$topicId&level=$level',
+      '/practice/questions?topicId=$topicId&level=$level&mode=${Uri.encodeQueryComponent(mode)}',
       token: token,
     );
     return PracticeSessionData.fromJson(response);
@@ -140,32 +154,34 @@ class HttpEduCoachApi implements EduCoachApi {
   }
 
   Future<Map<String, dynamic>> _get(String path, {String? token}) async {
+    final uri = Uri.parse('$baseUrl$path');
     try {
       final response = await _client
           .get(
-            Uri.parse('$baseUrl$path'),
+            uri,
             headers: _headers(token),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(_requestTimeout);
       return _decodeObject(response);
     } on TimeoutException {
-      throw const ApiException('Tiempo de espera agotado. Intenta de nuevo.');
+      throw const ApiException(_timeoutMessage);
     } catch (_) {
       throw const ApiException('No se pudo conectar al servidor. Verifica tu conexion.');
     }
   }
 
   Future<List<dynamic>> _getList(String path, {String? token}) async {
+    final uri = Uri.parse('$baseUrl$path');
     try {
       final response = await _client
           .get(
-            Uri.parse('$baseUrl$path'),
+            uri,
             headers: _headers(token),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(_requestTimeout);
       return _decodeList(response);
     } on TimeoutException {
-      throw const ApiException('Tiempo de espera agotado. Intenta de nuevo.');
+      throw const ApiException(_timeoutMessage);
     } catch (_) {
       throw const ApiException('No se pudo conectar al servidor. Verifica tu conexion.');
     }
@@ -176,17 +192,18 @@ class HttpEduCoachApi implements EduCoachApi {
     String? token,
     required Map<String, dynamic> body,
   }) async {
+    final uri = Uri.parse('$baseUrl$path');
     try {
       final response = await _client
           .post(
-            Uri.parse('$baseUrl$path'),
+            uri,
             headers: _headers(token),
             body: jsonEncode(body),
           )
-          .timeout(const Duration(seconds: 20));
+          .timeout(_requestTimeout);
       return _decodeObject(response);
     } on TimeoutException {
-      throw const ApiException('Tiempo de espera agotado. Intenta de nuevo.');
+      throw const ApiException(_timeoutMessage);
     } catch (_) {
       throw const ApiException('No se pudo conectar al servidor. Verifica tu conexion.');
     }
@@ -341,12 +358,19 @@ class DiagnosticTopicResult {
   }
 }
 
+abstract final class PracticeMode {
+  static const normal = 'normal';
+  static const review = 'review';
+}
+
 class PracticeSessionData {
   const PracticeSessionData({
     required this.sessionId,
     required this.topicId,
     required this.topicName,
     required this.difficultyLevel,
+    required this.mode,
+    this.modeMessage,
     required this.questions,
   });
 
@@ -354,6 +378,8 @@ class PracticeSessionData {
   final int topicId;
   final String topicName;
   final int difficultyLevel;
+  final String mode;
+  final String? modeMessage;
   final List<PracticeQuestion> questions;
 
   factory PracticeSessionData.fromJson(Map<String, dynamic> json) {
@@ -363,6 +389,8 @@ class PracticeSessionData {
       topicId: json['topicId'] as int,
       topicName: json['topicName'] as String,
       difficultyLevel: json['difficultyLevel'] as int,
+      mode: json['mode'] as String? ?? PracticeMode.normal,
+      modeMessage: json['modeMessage'] as String?,
       questions: questions
           .map((item) => PracticeQuestion.fromJson(item as Map<String, dynamic>))
           .toList(),
@@ -434,12 +462,14 @@ class PracticeAnswerResult {
     required this.currentLevel,
     required this.streakDays,
     required this.sessionCompleted,
+    this.explanationRaw,
     this.explanation,
   });
 
   final bool correct;
   final String correctOption;
-  final String? explanation;
+  final String? explanationRaw;
+  final AiMathExplanation? explanation;
   final int sessionCorrectCount;
   final int sessionTotalCount;
   final int currentLevel;
@@ -447,10 +477,12 @@ class PracticeAnswerResult {
   final bool sessionCompleted;
 
   factory PracticeAnswerResult.fromJson(Map<String, dynamic> json) {
+    final explanationRaw = json['explanation'] as String?;
     return PracticeAnswerResult(
       correct: json['correct'] as bool,
       correctOption: json['correctOption'] as String,
-      explanation: json['explanation'] as String?,
+      explanationRaw: explanationRaw,
+      explanation: AiMathExplanation.tryParse(explanationRaw),
       sessionCorrectCount: json['sessionCorrectCount'] as int,
       sessionTotalCount: json['sessionTotalCount'] as int,
       currentLevel: json['currentLevel'] as int,
@@ -575,6 +607,7 @@ class PracticeSessionAnswer {
     required this.selectedOption,
     required this.correctOption,
     required this.isCorrect,
+    this.aiExplanationRaw,
     this.aiExplanation,
     required this.answeredAtUtc,
   });
@@ -584,18 +617,93 @@ class PracticeSessionAnswer {
   final String selectedOption;
   final String correctOption;
   final bool isCorrect;
-  final String? aiExplanation;
+  final String? aiExplanationRaw;
+  final AiMathExplanation? aiExplanation;
   final DateTime answeredAtUtc;
 
   factory PracticeSessionAnswer.fromJson(Map<String, dynamic> json) {
+    final aiExplanationRaw = json['aiExplanation'] as String?;
     return PracticeSessionAnswer(
       questionId: json['questionId'] as String,
       statement: json['statement'] as String,
       selectedOption: json['selectedOption'] as String,
       correctOption: json['correctOption'] as String,
       isCorrect: json['isCorrect'] as bool,
-      aiExplanation: json['aiExplanation'] as String?,
+      aiExplanationRaw: aiExplanationRaw,
+      aiExplanation: AiMathExplanation.tryParse(aiExplanationRaw),
       answeredAtUtc: DateTime.parse(json['answeredAtUtc'] as String),
+    );
+  }
+}
+
+class AiMathExplanation {
+  const AiMathExplanation({
+    required this.summary,
+    required this.steps,
+    required this.finalAnswerText,
+    required this.encouragement,
+  });
+
+  final String summary;
+  final List<AiMathExplanationStep> steps;
+  final String finalAnswerText;
+  final String encouragement;
+
+  static AiMathExplanation? tryParse(String? raw) {
+    final trimmed = raw?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return null;
+    }
+
+    if (trimmed.startsWith('{')) {
+      try {
+        final decoded = jsonDecode(trimmed);
+        if (decoded is Map<String, dynamic>) {
+          return AiMathExplanation.fromJson(decoded);
+        }
+      } catch (_) {
+        // Legacy or malformed payloads fall back to plain text rendering.
+      }
+    }
+
+    return AiMathExplanation(
+      summary: trimmed,
+      steps: const [],
+      finalAnswerText: '',
+      encouragement: '',
+    );
+  }
+
+  factory AiMathExplanation.fromJson(Map<String, dynamic> json) {
+    final steps = json['steps'] as List<dynamic>? ?? const <dynamic>[];
+    return AiMathExplanation(
+      summary: (json['summary'] as String? ?? '').trim(),
+      steps: steps
+          .map((item) => AiMathExplanationStep.fromJson(item as Map<String, dynamic>))
+          .where((item) => item.title.isNotEmpty && item.text.isNotEmpty)
+          .toList(),
+      finalAnswerText: (json['finalAnswerText'] as String? ?? '').trim(),
+      encouragement: (json['encouragement'] as String? ?? '').trim(),
+    );
+  }
+}
+
+class AiMathExplanationStep {
+  const AiMathExplanationStep({
+    required this.title,
+    required this.text,
+    required this.formulaLatex,
+  });
+
+  final String title;
+  final String text;
+  final String formulaLatex;
+
+  factory AiMathExplanationStep.fromJson(Map<String, dynamic> json) {
+    return AiMathExplanationStep(
+      title: (json['title'] as String? ?? '').trim(),
+      text: (json['text'] as String? ?? '').trim(),
+      formulaLatex: (json['formulaLatex'] as String? ?? '').trim(),
     );
   }
 }

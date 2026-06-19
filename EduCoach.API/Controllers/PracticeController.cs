@@ -14,7 +14,10 @@ public sealed class PracticeController(PracticeService practiceService) : Contro
     [HttpGet("questions")]
     [ProducesResponseType<PracticeSessionResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<PracticeSessionResponse>> GetQuestions([FromQuery] int topicId, [FromQuery] int level = 1)
+    public async Task<ActionResult<PracticeSessionResponse>> GetQuestions(
+        [FromQuery] int topicId,
+        [FromQuery] int level = 1,
+        [FromQuery] string mode = "normal")
     {
         var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
         if (!Guid.TryParse(userIdValue, out var userId))
@@ -29,7 +32,7 @@ public sealed class PracticeController(PracticeService practiceService) : Contro
 
         try
         {
-            var response = await practiceService.StartSessionAsync(userId, topicId, level);
+            var response = await practiceService.StartSessionAsync(userId, topicId, level, mode, HttpContext.RequestAborted);
             return Ok(response);
         }
         catch (InvalidOperationException exception)
