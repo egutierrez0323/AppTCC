@@ -18,7 +18,7 @@ services:
       - key: Jwt__SecretKey
         sync: false
       - key: DeepSeek__BaseUrl
-        sync: false
+        value: https://api.deepseek.com
       - key: DeepSeek__ApiKey
         sync: false
       - key: DeepSeek__Model

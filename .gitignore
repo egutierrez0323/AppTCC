@@ -33,3 +33,6 @@ educoach_app/android/app/debug/
 educoach_app/android/app/profile/
 educoach_app/android/app/release/
 educoach_app/ios/Flutter/.last_build_id
+
+# User secrets / local config (never commit credentials)
+**/appsettings.Development.json
