@@ -28,6 +28,9 @@ class FakeEduCoachApi implements EduCoachApi {
   Future<List<DiagnosticQuestion>> getDiagnosticQuestions(String token) async => [];
 
   @override
+  Future<List<PracticeTopic>> getTopics(String token) async => [];
+
+  @override
   Future<List<ProgressTopic>> getProgress(String token) async => [];
 
   @override
@@ -49,7 +52,12 @@ class FakeEduCoachApi implements EduCoachApi {
       [];
 
   @override
-  Future<PracticeSessionData> startPractice(String token, int topicId, int level) {
+  Future<PracticeSessionData> startPractice(
+    String token,
+    int topicId,
+    int level, {
+    String mode = PracticeMode.normal,
+  }) {
     throw UnimplementedError();
   }
 
