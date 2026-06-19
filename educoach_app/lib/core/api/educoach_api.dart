@@ -361,6 +361,7 @@ class DiagnosticTopicResult {
 abstract final class PracticeMode {
   static const normal = 'normal';
   static const review = 'review';
+  static const mixed = 'mixed';
 }
 
 class PracticeSessionData {

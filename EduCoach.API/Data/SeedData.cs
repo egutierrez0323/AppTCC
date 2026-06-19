@@ -42,7 +42,8 @@ public static class SeedData
             new Topic { Id = 1, Name = "Fracciones", Description = "Operaciones basicas con fracciones", IconName = "pie_chart" },
             new Topic { Id = 2, Name = "Algebra Basica", Description = "Expresiones y ecuaciones de primer grado", IconName = "functions" },
             new Topic { Id = 3, Name = "Decimales", Description = "Operaciones y comparacion con numeros decimales", IconName = "calculate" },
-            new Topic { Id = 4, Name = "Geometria Basica", Description = "Perimetro, area y figuras geometricas simples", IconName = "category" }
+            new Topic { Id = 4, Name = "Geometria Basica", Description = "Perimetro, area y figuras geometricas simples", IconName = "category" },
+            new Topic { Id = 99, Name = "Practica mixta", Description = "Sesion con preguntas mezcladas de varios temas", IconName = "shuffle" }
         ];
     }
 

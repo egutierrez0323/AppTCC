@@ -8,8 +8,10 @@ namespace EduCoach.API.Services;
 public sealed class PracticeService(AppDbContext dbContext, DeepSeekService deepSeekService)
 {
     private const int DefaultSessionQuestionCount = 5;
+    private const int MixedTopicId = 99;
     private const string NormalMode = "normal";
     private const string ReviewMode = "review";
+    private const string MixedMode = "mixed";
 
     public async Task<PracticeSessionResponse> StartSessionAsync(
         Guid userId,
@@ -18,21 +20,38 @@ public sealed class PracticeService(AppDbContext dbContext, DeepSeekService deep
         string? mode,
         CancellationToken cancellationToken = default)
     {
-        var topic = await dbContext.Topics.AsNoTracking().FirstOrDefaultAsync(item => item.Id == topicId)
-            ?? throw new InvalidOperationException("El tema seleccionado no existe.");
-
         var sanitizedLevel = Math.Clamp(level, 1, 3);
         var sanitizedMode = NormalizeMode(mode);
         var actualMode = sanitizedMode;
         string? modeMessage = null;
+        Topic topic;
+        List<(Question question, bool wasFailedBefore)> questions;
 
-        var questions = sanitizedMode == ReviewMode
-            ? await GetReviewQuestionsAsync(userId, topicId, sanitizedLevel, cancellationToken)
-            : await GetNormalQuestionsAsync(topicId, sanitizedLevel, cancellationToken: cancellationToken);
+        if (sanitizedMode == MixedMode)
+        {
+            topic = await dbContext.Topics.AsNoTracking().FirstOrDefaultAsync(
+                    item => item.Id == MixedTopicId,
+                    cancellationToken)
+                ?? throw new InvalidOperationException("No fue posible preparar la practica mixta.");
+            questions = await GetMixedQuestionsAsync(sanitizedLevel, cancellationToken);
+        }
+        else
+        {
+            topic = await dbContext.Topics.AsNoTracking().FirstOrDefaultAsync(
+                    item => item.Id == topicId,
+                    cancellationToken)
+                ?? throw new InvalidOperationException("El tema seleccionado no existe.");
+            questions = sanitizedMode == ReviewMode
+                ? await GetReviewQuestionsAsync(userId, topicId, sanitizedLevel, cancellationToken)
+                : await GetNormalQuestionsAsync(topicId, sanitizedLevel, cancellationToken: cancellationToken);
+        }
 
         if (questions.Count == 0)
         {
-            throw new InvalidOperationException("No hay preguntas de practica disponibles para ese tema y nivel.");
+            throw new InvalidOperationException(
+                sanitizedMode == MixedMode
+                    ? "No hay preguntas suficientes para la practica mixta en ese nivel."
+                    : "No hay preguntas de practica disponibles para ese tema y nivel.");
         }
 
         if (sanitizedMode == ReviewMode && !questions.Any(question => question.wasFailedBefore))
@@ -80,6 +99,7 @@ public sealed class PracticeService(AppDbContext dbContext, DeepSeekService deep
         return normalized switch
         {
             ReviewMode => ReviewMode,
+            MixedMode => MixedMode,
             _ => NormalMode
         };
     }
@@ -157,6 +177,47 @@ public sealed class PracticeService(AppDbContext dbContext, DeepSeekService deep
             .ToList();
     }
 
+    private async Task<List<(Question question, bool wasFailedBefore)>> GetMixedQuestionsAsync(
+        int level,
+        CancellationToken cancellationToken = default)
+    {
+        var availableQuestions = await dbContext.Questions
+            .AsNoTracking()
+            .Where(question =>
+                !question.IsDiagnostic &&
+                question.TopicId != MixedTopicId &&
+                question.DifficultyLevel == level)
+            .ToListAsync(cancellationToken);
+
+        if (availableQuestions.Count == 0)
+        {
+            return [];
+        }
+
+        var prioritizedQuestions = availableQuestions
+            .GroupBy(question => question.TopicId)
+            .Select(group => group.OrderBy(_ => Guid.NewGuid()).First())
+            .OrderBy(_ => Guid.NewGuid())
+            .Take(DefaultSessionQuestionCount)
+            .ToList();
+
+        if (prioritizedQuestions.Count < DefaultSessionQuestionCount)
+        {
+            var selectedIds = prioritizedQuestions.Select(question => question.Id).ToHashSet();
+            var fillerQuestions = availableQuestions
+                .Where(question => !selectedIds.Contains(question.Id))
+                .OrderBy(_ => Guid.NewGuid())
+                .Take(DefaultSessionQuestionCount - prioritizedQuestions.Count);
+
+            prioritizedQuestions.AddRange(fillerQuestions);
+        }
+
+        return prioritizedQuestions
+            .Take(DefaultSessionQuestionCount)
+            .Select(question => (question, wasFailedBefore: false))
+            .ToList();
+    }
+
     public async Task<SubmitPracticeAnswerResponse> SubmitAnswerAsync(Guid userId, SubmitPracticeAnswerRequest request, CancellationToken cancellationToken = default)
     {
         var session = await dbContext.PracticeSessions
@@ -182,12 +243,13 @@ public sealed class PracticeService(AppDbContext dbContext, DeepSeekService deep
             throw new InvalidOperationException("Esta pregunta ya fue respondida en la sesion actual.");
         }
 
+        var isMixedSession = session.TopicId == MixedTopicId;
         var question = await dbContext.Questions
             .AsNoTracking()
             .FirstOrDefaultAsync(item =>
                 item.Id == request.QuestionId &&
-                item.TopicId == session.TopicId &&
                 item.DifficultyLevel == session.DifficultyLevel &&
+                (isMixedSession ? item.TopicId != MixedTopicId : item.TopicId == session.TopicId) &&
                 !item.IsDiagnostic, cancellationToken)
             ?? throw new InvalidOperationException("La pregunta enviada no pertenece a esta sesion.");
 
@@ -224,14 +286,14 @@ public sealed class PracticeService(AppDbContext dbContext, DeepSeekService deep
         }
 
         var progress = await dbContext.UserProgress.FirstOrDefaultAsync(
-            item => item.UserId == userId && item.TopicId == session.TopicId, cancellationToken);
+            item => item.UserId == userId && item.TopicId == question.TopicId, cancellationToken);
 
         if (progress is null)
         {
             progress = new UserProgress
             {
                 UserId = userId,
-                TopicId = session.TopicId,
+                TopicId = question.TopicId,
                 CurrentLevel = session.DifficultyLevel
             };
             dbContext.UserProgress.Add(progress);
@@ -243,7 +305,7 @@ public sealed class PracticeService(AppDbContext dbContext, DeepSeekService deep
             progress.TotalCorrect++;
         }
 
-        if (session.ConsecutiveCorrectCount >= 3)
+        if (!isMixedSession && session.ConsecutiveCorrectCount >= 3)
         {
             progress.CurrentLevel = Math.Min(3, progress.CurrentLevel + 1);
             session.ConsecutiveCorrectCount = 0;
@@ -261,7 +323,7 @@ public sealed class PracticeService(AppDbContext dbContext, DeepSeekService deep
             Explanation = explanation,
             SessionCorrectCount = session.CorrectCount,
             SessionTotalCount = session.TotalCount,
-            CurrentLevel = progress.CurrentLevel,
+            CurrentLevel = isMixedSession ? session.DifficultyLevel : progress.CurrentLevel,
             StreakDays = progress.StreakDays,
             SessionCompleted = session.EndedAt is not null
         };

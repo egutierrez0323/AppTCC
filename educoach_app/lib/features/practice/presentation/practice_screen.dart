@@ -34,6 +34,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
   static const _modes = <String>[
     PracticeMode.normal,
     PracticeMode.review,
+    PracticeMode.mixed,
   ];
 
   late int _topicId;
@@ -225,12 +226,21 @@ class _PracticeScreenState extends State<PracticeScreen> {
                           ),
                         )
                         .toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => _topicId = value);
-                      }
-                    },
+                    onChanged: _mode == PracticeMode.mixed
+                        ? null
+                        : (value) {
+                            if (value != null) {
+                              setState(() => _topicId = value);
+                            }
+                          },
                   ),
+                  if (_mode == PracticeMode.mixed) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'En practica mixta el tema se ignora y se combinan preguntas de varios temas en el nivel elegido.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   DropdownButtonFormField<int>(
                     initialValue: _level,
@@ -362,6 +372,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
 
   String _modeLabel(String mode) {
     return switch (mode) {
+      PracticeMode.mixed => 'Practica mixta',
       PracticeMode.review => 'Repasar errores',
       _ => 'Practica normal',
     };
@@ -369,6 +380,8 @@ class _PracticeScreenState extends State<PracticeScreen> {
 
   String _modeDescription(String mode) {
     return switch (mode) {
+      PracticeMode.mixed =>
+        'Combina preguntas de varios temas usando el nivel seleccionado. El tema queda solo como referencia y no limita la sesion.',
       PracticeMode.review =>
         'Prioriza preguntas que ya fallaste antes en el tema y nivel elegidos. Si aun no hay errores previos, inicia una practica normal.',
       _ => 'Inicia una sesion normal con preguntas del tema y nivel seleccionados.',
